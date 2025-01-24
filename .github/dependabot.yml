@@ -3,7 +3,7 @@
 # Please see the documentation for all configuration options:
 version: 2
 updates:
-  - package-ecosystem: "upb" # See documentation for possible values
+  - package-ecosystem: "pub" # See documentation for possible values
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
