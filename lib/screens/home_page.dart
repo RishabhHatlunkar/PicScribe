@@ -66,14 +66,16 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _extractTextFromImages() async {
     final images = ref.read(imagesProvider);
     final apiKey = ref.read(apiKeyProvider);
+    final geminiService =
+    ref.read(geminiServiceProvider); // Get the GeminiService instance
 
     if (images.isEmpty) {
-        _showSnackBar( 'Please select images first.');
-        return;
+      _showSnackBar('Please select images first.');
+      return;
     }
 
     if (apiKey == null || apiKey.isEmpty) {
-        _showApiKeyDialog();
+      _showApiKeyDialog();
       return;
     }
 
@@ -81,45 +83,44 @@ class _HomePageState extends ConsumerState<HomePage> {
     ref.read(loadingStateProvider.notifier).state = true;
 
     try {
-     List<List<dynamic>> extractedData = [];
+      List<dynamic> parsedData = [];
       for (var image in images) {
-        final extractedText = await ref.read(extractTextProvider(File(image.path)).future);
+        // Use the geminiService instance to call extractTextFromImage
+        final result = await geminiService.extractTextFromImage(image as XFile);
 
-        try {
-             List<List<dynamic>> csvData = const CsvToListConverter().convert(extractedText);
-            if (csvData.isEmpty){
-              throw Exception('Invalid CSV Format: No data found.');
-            }
-            extractedData.addAll(csvData);
-
-        } catch (e) {
-           throw Exception('Error parsing CSV: $e');
+        if (result[0] == "Error") {
+          throw Exception(result[1]);
         }
+
+        parsedData.add(result);
+// Add the [Type, Data] list to parsedData
+
         final conversionItem = ConversionItem(
-              imagePath: image.path,
-              extractedText: extractedText,
-              timestamp: DateTime.now());
+            imagePath: image.path,
+            extractedText: result[1] is String ? result[1] : const ListToCsvConverter().convert(result[1]), // Get raw text from result
+            timestamp: DateTime.now());
         await ref.read(saveConversionProvider(conversionItem).future);
       }
-      final extractedText = extractedData.map((e) => e.join(" , ")).toList();
-       ref.read(extractedTextProvider.notifier).state =  extractedText;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-              ref.read(imagesProvider.notifier).state = []; // Remove the selected image.
-              Navigator.push(
-                _scaffoldKey.currentContext!,
-                 MaterialPageRoute(
-                   builder: (context) => TableDisplayPage(
-                       extractedText: extractedText,
-                        images: images,
-                     ),
-                )
-             );
-          });
 
-       _loadHistory();
+      // Update the provider with the parsed data
+      ref.read(parsedDataProvider.notifier).state = parsedData;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(imagesProvider.notifier).state = []; // Remove the selected image.
+        Navigator.push(
+            _scaffoldKey.currentContext!,
+            MaterialPageRoute(
+              builder: (context) => TableDisplayPage(
+                parsedData: parsedData, // Pass the parsed data
+                images: images,
+              ),
+            ));
+      });
+
+      _loadHistory();
     } catch (e) {
       print('Error extracting text: $e');
-     _showSnackBar( 'Error extracting text: $e');
+      _showSnackBar('Error extracting text: $e');
     } finally {
       ref.read(loadingStateProvider.notifier).state = false;
     }
@@ -249,18 +250,29 @@ class _HomePageState extends ConsumerState<HomePage> {
                           itemBuilder: (context, index) {
                               ConversionItem item = snapshot.data![index]!;
                                return  GestureDetector(
-                                onTap: () {
-                                    Navigator.push(
+                                 onTap: () async {
+                                   // Get the GeminiService instance
+                                   final geminiService = ref.read(geminiServiceProvider);
+
+                                   // Re-extract and parse the data
+                                   final result = await geminiService.extractTextFromImage(XFile(item.imagePath) as XFile);
+
+                                   if (result[0] == "Error") {
+                                     // Handle the error, maybe show a SnackBar
+                                     _showSnackBar('Error: ${result[1]}');
+                                   } else {
+                                     Navigator.push(
                                        context,
-                                        MaterialPageRoute(
-                                            builder: (context) => TableDisplayPage(
-                                                extractedText: [item.extractedText],
-                                                 images: [XFile(item.imagePath)],
-                                             )
-                                        )
-                                      );
+                                       MaterialPageRoute(
+                                         builder: (context) => TableDisplayPage(
+                                           parsedData: [result], // Pass the re-extracted data
+                                           images: [XFile(item.imagePath)],
+                                         ),
+                                       ),
+                                     );
+                                   }
                                  },
-                                  child: Card(
+                                 child: Card(
                                   margin: const EdgeInsets.all(8.0),
                                   child: Padding(
                                       padding: const EdgeInsets.all(8.0),
