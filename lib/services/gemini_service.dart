@@ -1,19 +1,14 @@
-import 'dart:async';
-
-import 'package:csv/csv.dart'; // Import the csv package
-import 'package:google_generative_ai/google_generative_ai.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/http.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart';
 import 'dart:io';
+import 'dart:async';
+import 'package:flutter/services.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:jinja/jinja.dart' as jj;
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:image_picker/image_picker.dart';
+import 'package:csv/csv.dart'; // Import the csv package
+
 
 class GeminiService {
   final String apiKey;
-
   GeminiService(this.apiKey);
 
   // Function to parse the Gemini API response
@@ -49,43 +44,49 @@ class GeminiService {
       return ["Error", "Could not parse response.\n" + response];
     }
   }
-
   Future<String> _loadTemplate(String templatePath) async {
-    return await rootBundle.loadString(templatePath);
+     return await rootBundle.loadString(templatePath);
   }
 
-  Future<List<dynamic>> extractTextFromImage(XFile imageFile) async {
+  Future<List<dynamic>> extractTextFromImage(XFile imageFile, String instruction) async {
     try {
       final model = GenerativeModel(model: 'gemini-2.0-flash-exp', apiKey: apiKey);
 
       // Load the template file
-      final String promptTemplate = await _loadTemplate('lib/templates/prompt.jinja2');
-      final template = jj.Template(promptTemplate);
-      final prompt = template.render({'api_key': apiKey});
+       final String promptTemplate = await _loadTemplate('lib/templates/prompt.jinja2');
+        final template = jj.Template(promptTemplate);
+        final prompt = template.render({'api_key': apiKey,'instruction': instruction});
+      
+       final content = Content.multi([
+          DataPart('image/jpeg', await imageFile.readAsBytes()),
+          TextPart(prompt),
+       ]);
 
-      final content = Content.multi([
-        DataPart('image/jpeg', await imageFile.readAsBytes()),
-        TextPart(prompt),
-      ]);
-
-      final response = await model.generateContent([content]);
+      final response = await model.generateContent([content]).timeout(const Duration(seconds: 30));
 
       final rawText = response.text ?? 'No text found.';
 
       // Parse the response using the parseGeminiResponse function
       return parseGeminiResponse(rawText);
-    } catch (e) {
-      print('Error in GeminiService: $e');
-      if (e is GenerativeAIException) {
-        if (e.message.contains("API key not valid")) {
-          throw Exception("Invalid API Key. Please check your key.");
-        }
-        throw Exception('Gemini API Error: ${e.message}');
-      } else if (e is TimeoutException) {
-        throw Exception('Gemini API Timeout: Request took too long.');
-      } else {
-        throw Exception('Could not extract text: ${e.toString()}');
-      }
-    }
-  }
+    }  on GenerativeAIException catch (e) {
+          print('Error in GeminiService: $e');
+       if (e.message.contains("API key not valid")) {
+         return ["Error", "Invalid API Key. Please check your key."];
+       }
+        return  ["Error", 'Gemini API Error: ${e.message}'];
+     } on TimeoutException catch (e) {
+       print('Timeout in GeminiService: $e');
+     return  ["Error", 'Gemini API Timeout: Request took too long.'];
+  } on SocketException catch (e) {
+     print('SocketException in GeminiService: $e');
+        return ["Error", "Could not connect to the server. Check your network connection."];
+  }  catch(e) {
+      print('Exception in GeminiService: $e');
+      return ["Error", 'Could not extract text: ${e.toString()}'];
+   }
+}
+
+ bool isValidApiKey(String apiKey) {
+  return apiKey.isNotEmpty && apiKey.length > 30;
+}
 }

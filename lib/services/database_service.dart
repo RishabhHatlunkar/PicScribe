@@ -25,7 +25,8 @@ class DatabaseService {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         imagePath TEXT NOT NULL,
         extractedText TEXT NOT NULL,
-        timestamp TEXT NOT NULL
+        timestamp TEXT NOT NULL,
+        instruction TEXT NOT NULL
       )
     ''');
     await db.execute('''
@@ -54,6 +55,16 @@ class DatabaseService {
     });
   }
 
+   Future<int> deleteConversion(int id) async {
+      final db = await database;
+      return db.delete(
+          'conversion_history',
+          where: 'id = ?',
+          whereArgs: [id],
+      );
+  }
+
+
   Future<int> insertLearningItem(LearningItem item) async {
     final db = await database;
     return await db.insert(
@@ -71,6 +82,15 @@ class DatabaseService {
     });
   }
 
+    Future<int> deleteLearningItem(int id) async {
+    final db = await database;
+    return db.delete(
+      'learning_items',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+  
   Future<void> close() async {
     final db = await database;
     db.close();

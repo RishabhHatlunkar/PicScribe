@@ -4,33 +4,38 @@ import 'package:pixelsheet/screens/home_page.dart';
 import 'package:pixelsheet/screens/settings_page.dart';
 import 'package:pixelsheet/screens/learning_page.dart';
 import 'package:animated_notch_bottom_bar/animated_notch_bottom_bar/animated_notch_bottom_bar.dart';
+import 'package:pixelsheet/screens/history_page.dart';
+import 'package:pixelsheet/services/database_service.dart';
+import 'package:pixelsheet/providers/providers.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
+  final databaseService = DatabaseService();
   runApp(
-    const ProviderScope(
-      child: MyApp(),
+    ProviderScope(
+      child: MyApp(databaseService: databaseService),
     ),
   );
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class MyApp extends ConsumerWidget {
+  final DatabaseService databaseService;
+  const MyApp({Key? key, required this.databaseService}) : super(key: key);
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
       title: 'Image to Text Converter',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: const MainScreen(),
+      home:  MainScreen(databaseService: databaseService),
     );
   }
 }
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({Key? key}) : super(key: key);
+  final DatabaseService databaseService;
+  const MainScreen({Key? key, required this.databaseService}) : super(key: key);
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -43,25 +48,39 @@ class _MainScreenState extends State<MainScreen> {
   /// Controller to handle PageView and also handles initial page
   final _controller = NotchBottomBarController(index: 0);
 
-  final List<Widget> _pages = [
-    const HomePage(),
-    LearningPage(),
-    const SettingsPage(),
-  ];
+  late final List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = [
+      const HomePage(),
+      LearningPage(),
+      const HistoryPage(),
+      const SettingsPage(),
+    ];
+  }
 
   @override
   void dispose() {
     _pageController.dispose();
+     widget.databaseService.close();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true, // Added here so that FAB will not be hidden
-        body: PageView(
+   
+    return Consumer(
+      builder: (BuildContext context, WidgetRef ref, Widget? child) {
+         final isLoading = ref.watch(loadingStateProvider);
+      return IgnorePointer(
+        ignoring: isLoading,
+      child: Scaffold(
+        extendBody: true,
+          body: PageView(
             controller: _pageController,
-            physics: const NeverScrollableScrollPhysics(),
+              physics: const NeverScrollableScrollPhysics(),
            children: _pages
           ),
         bottomNavigationBar: (
@@ -71,20 +90,25 @@ class _MainScreenState extends State<MainScreen> {
              showLabel: false,
             notchColor: Colors.blue,
             removeMargins: false,
-             bottomBarItems: const [
+             bottomBarItems: [
               BottomBarItem(
-                inActiveItem: Icon(Icons.home_outlined, color: Colors.grey,),
-                activeItem: Icon(Icons.home, color: Colors.white,),
+                inActiveItem: const Icon(Icons.home_outlined, color: Colors.grey,),
+                activeItem: const Icon(Icons.home, color: Colors.white,),
                 itemLabel: 'Home',
               ),
               BottomBarItem(
-                inActiveItem: Icon(Icons.school_outlined, color: Colors.grey),
-                activeItem: Icon(Icons.school, color: Colors.white,),
+                inActiveItem: const Icon(Icons.school_outlined, color: Colors.grey),
+                activeItem: const Icon(Icons.school, color: Colors.white,),
                 itemLabel: 'Learning',
               ),
                BottomBarItem(
-                inActiveItem: Icon(Icons.settings_outlined, color: Colors.grey),
-                activeItem: Icon(Icons.settings, color: Colors.white,),
+                inActiveItem: const Icon(Icons.history_outlined, color: Colors.grey),
+                activeItem: const Icon(Icons.history, color: Colors.white,),
+                itemLabel: 'History',
+              ),
+               BottomBarItem(
+                inActiveItem: const Icon(Icons.settings_outlined, color: Colors.grey),
+                activeItem: const Icon(Icons.settings, color: Colors.white,),
                 itemLabel: 'Settings',
               ),
             ],
@@ -94,9 +118,11 @@ class _MainScreenState extends State<MainScreen> {
                  duration: const Duration(milliseconds: 250),
                  curve: Curves.easeIn,
                 );
-            }, kIconSize: 20, kBottomRadius: 30,
+            }, kIconSize: 20,kBottomRadius: 40,
           )
         ),
-    );
+      ),
+    );}
+  );
   }
 }

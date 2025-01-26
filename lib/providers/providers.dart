@@ -18,13 +18,15 @@ final extractedTextProvider = StateProvider<List<String>>((ref) => []);
 final loadingStateProvider = StateProvider<bool>((ref) => false);
 
 // Gemini Service Provider
+// Gemini Service Provider
 final geminiServiceProvider = Provider<GeminiService>((ref) {
-  final apiKey = ref.watch(apiKeyProvider);
-  if (apiKey == null || apiKey.isEmpty) {
-    throw Exception("API Key is not set.");
-  }
-  return GeminiService(apiKey);
+    final apiKey = ref.watch(apiKeyProvider);
+    if (apiKey == null || apiKey.isEmpty) {
+        return GeminiService(''); // Return a GeminiService with an empty API key
+    }
+    return GeminiService(apiKey);
 });
+
 
 // Database Service Provider
 final databaseServiceProvider = Provider<DatabaseService>((ref) => DatabaseService());
@@ -35,14 +37,14 @@ final parsedDataProvider = StateProvider<List<dynamic>>((ref) => []);
 
 // Async Function to Extract Text from Image
 final extractTextProvider = FutureProvider.family<List, File>((ref, imageFile) async {
-  final apiKey = ref.watch(apiKeyProvider);
-  final geminiService = ref.read(geminiServiceProvider);
+    final apiKey = ref.watch(apiKeyProvider);
+    final geminiService = ref.read(geminiServiceProvider);
+    final instruction = ref.read(extractedTextProvider.notifier).state.isEmpty ? "" : ref.read(extractedTextProvider.notifier).state.first;
 
-  if (apiKey == null || apiKey.isEmpty) {
-    throw Exception('API Key is required.');
-  }
-
-  return geminiService.extractTextFromImage(imageFile as XFile);
+   if (apiKey == null || apiKey.isEmpty) {
+      throw Exception('API Key is required.');
+    }
+  return geminiService.extractTextFromImage(imageFile as XFile,instruction); // Passing both instruction and XFile
 });
 
 // Async Function to Save Conversion to Database

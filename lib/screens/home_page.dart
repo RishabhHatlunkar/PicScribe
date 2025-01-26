@@ -8,12 +8,10 @@ import 'package:pixelsheet/widgets/custom_app_bar.dart';
 import 'package:pixelsheet/services/csv_service.dart';
 import 'package:pixelsheet/providers/providers.dart';
 import 'package:pixelsheet/models/conversion_item.dart';
-import 'package:csv/csv.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:intl/intl.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:pixelsheet/screens/table_display_page.dart';
+import 'package:csv/csv.dart';
 
 
 class HomePage extends ConsumerStatefulWidget {
@@ -24,9 +22,9 @@ class HomePage extends ConsumerStatefulWidget {
 }
 
 class _HomePageState extends ConsumerState<HomePage> {
-  late Future<List<ConversionItem>> _historyItems;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
-  bool _showHistory = false; // Added this to manage the bottom sheet
+  final TextEditingController _instructionController = TextEditingController();
+  File? _imageFile;
 
   @override
   void initState() {
@@ -34,19 +32,12 @@ class _HomePageState extends ConsumerState<HomePage> {
      WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkApiKeyAndShowDialog();
     });
-    _loadHistory();
   }
 
-    Future<void> _checkApiKeyAndShowDialog() async {
+  Future<void> _checkApiKeyAndShowDialog() async {
       if (ref.read(apiKeyProvider) == null) {
        _showApiKeyDialog();
        }
-  }
-
-
-  Future<void> _loadHistory() async {
-    final databaseService = ref.read(databaseServiceProvider);
-    _historyItems = databaseService.getConversions();
   }
 
   Future<void> _pickImage() async {
@@ -59,15 +50,19 @@ class _HomePageState extends ConsumerState<HomePage> {
       final savedImage = File(join(appDir.path, fileName));
 
       await File(image.path).copy(savedImage.path);
+       setState(() {
+          _imageFile = savedImage;
+       });
       ref.read(imagesProvider.notifier).state = [XFile(savedImage.path)];
     }
   }
 
-  Future<void> _extractTextFromImages() async {
+    Future<void> _extractTextFromImages() async {
     final images = ref.read(imagesProvider);
     final apiKey = ref.read(apiKeyProvider);
     final geminiService =
-    ref.read(geminiServiceProvider); // Get the GeminiService instance
+    ref.read(geminiServiceProvider);
+     final instruction = _instructionController.text;
 
     if (images.isEmpty) {
       _showSnackBar('Please select images first.');
@@ -86,38 +81,41 @@ class _HomePageState extends ConsumerState<HomePage> {
       List<dynamic> parsedData = [];
       for (var image in images) {
         // Use the geminiService instance to call extractTextFromImage
-        final result = await geminiService.extractTextFromImage(image as XFile);
+        final result = await geminiService.extractTextFromImage(image, instruction);
 
         if (result[0] == "Error") {
           throw Exception(result[1]);
         }
-
         parsedData.add(result);
-// Add the [Type, Data] list to parsedData
-
-        final conversionItem = ConversionItem(
+       final conversionItem = ConversionItem(
             imagePath: image.path,
-            extractedText: result[1] is String ? result[1] : const ListToCsvConverter().convert(result[1]), // Get raw text from result
-            timestamp: DateTime.now());
+            extractedText: result[1] is String ? result[1] : const ListToCsvConverter().convert(result[1]),
+            timestamp: DateTime.now(),
+            instruction: instruction
+            );
         await ref.read(saveConversionProvider(conversionItem).future);
       }
-
       // Update the provider with the parsed data
       ref.read(parsedDataProvider.notifier).state = parsedData;
+       setState(() {
+          _imageFile = null;
+          _instructionController.clear();
+        });
 
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(imagesProvider.notifier).state = []; // Remove the selected image.
-        Navigator.push(
-            _scaffoldKey.currentContext!,
+         if(_scaffoldKey.currentContext != null)
+        {
+           WidgetsBinding.instance.addPostFrameCallback((_) {
+            ref.read(imagesProvider.notifier).state = [];
+          Navigator.push(
+              _scaffoldKey.currentContext!,
             MaterialPageRoute(
               builder: (context) => TableDisplayPage(
-                parsedData: parsedData, // Pass the parsed data
-                images: images,
-              ),
+               parsedData: parsedData,
+                 images: images,
+                ),
             ));
-      });
-
-      _loadHistory();
+         });
+        }
     } catch (e) {
       print('Error extracting text: $e');
       _showSnackBar('Error extracting text: $e');
@@ -126,8 +124,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-     void _showApiKeyDialog() {
-      if (_scaffoldKey.currentContext == null) return;
+  void _showApiKeyDialog() {
+     if (_scaffoldKey.currentContext == null) return;
     showDialog(
       context: _scaffoldKey.currentContext!,
       builder: (context) {
@@ -139,50 +137,12 @@ class _HomePageState extends ConsumerState<HomePage> {
       },
     );
   }
-
-   Future<void> _exportConversionToCsv(ConversionItem item) async {
-    List<List<dynamic>> csvData = [
-      ['Image Path', 'Extracted Text', 'Timestamp'],
-      [
-        item.imagePath,
-        item.extractedText,
-        DateFormat('yyyy-MM-dd HH:mm:ss').format(item.timestamp),
-      ]
-    ];
-
-    try {
-      String message = await CsvService.exportToCsv(csvData, 'conversion_${item.id}');
-      _showSnackBar( message);
-
-    } catch (e) {
-        _showSnackBar( 'Error saving CSV: $e');
-    }
-  }
-
-    Future<void> _deleteConversion(ConversionItem item) async {
-    final databaseService = ref.read(databaseServiceProvider);
-    try {
-      await databaseService.close();
-      final dbPath = await getDatabasesPath();
-      final path = join(dbPath, 'conversion_history.db');
-      await deleteDatabase(path);
-      await databaseService.insertConversion(item);
-      setState(() {
-        _loadHistory();
-      });
-      _showSnackBar('Conversion deleted!');
-    } catch (e) {
-          _showSnackBar( 'Error during deletion: $e');
-    }
-  }
-
-
   Future<void> _exportToCsv() async {
     final extractedText = ref.read(extractedTextProvider);
     final images = ref.read(imagesProvider);
 
     if (extractedText.isEmpty) {
-      _showSnackBar('No text extracted to export.');
+        _showSnackBar('No text extracted to export.');
       return;
     }
 
@@ -196,190 +156,130 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     try {
       String message = await CsvService.exportToCsv(csvData, 'image_text');
-        _showSnackBar(message);
+         _showSnackBar(message);
     } catch (e) {
-         _showSnackBar( 'Error saving CSV: $e');
+          _showSnackBar( 'Error saving CSV: $e');
     }
   }
 
-   Widget _buildImageGrid() {
-    final images = ref.watch(imagesProvider);
-    return GridView.builder(
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 8.0,
-        mainAxisSpacing: 8.0,
+    Widget _buildImageGrid() {
+      final images = ref.watch(imagesProvider);
+    return  SizedBox(
+      height: 150,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal, // Added horizontal scrolling
+        itemCount: images.length,
+        itemBuilder: (context, index) {
+          final image = images[index];
+            return SizedBox(
+            width: 150,
+              child:  Image.file(
+                 File(image.path),
+                    fit: BoxFit.cover,
+               ),
+             );
+        },
       ),
-      itemCount: images.length,
-      itemBuilder: (context, index) {
-        final image = images[index];
-        return Stack(
-          children: [
-            Image.file(
-              File(image.path),
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
-            ),
-          ],
-        );
-      },
     );
   }
-     void _showSnackBar(String message) {
+  void _showSnackBar(String message) {
       if (_scaffoldKey.currentContext == null) return;
        ScaffoldMessenger.of(_scaffoldKey.currentContext!).showSnackBar(SnackBar(
               content: Text(message, style: const TextStyle(color: Colors.blue))));
   }
-  void _showHistoryBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (BuildContext context) {
-           return FutureBuilder<List<ConversionItem>>(
-                  future: _historyItems,
-                  builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                           return const Center(child: CircularProgressIndicator(color: Colors.blue,));
-                      } else if (snapshot.hasError) {
-                          return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.blue),));
-                      } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                         return Center(child: Text('No conversion history available.', style: const TextStyle(color: Colors.blue),));
-                      } else {
-                       return ListView.builder(
-                          itemCount: snapshot.data!.length,
-                          itemBuilder: (context, index) {
-                              ConversionItem item = snapshot.data![index]!;
-                               return  GestureDetector(
-                                 onTap: () async {
-                                   // Get the GeminiService instance
-                                   final geminiService = ref.read(geminiServiceProvider);
-
-                                   // Re-extract and parse the data
-                                   final result = await geminiService.extractTextFromImage(XFile(item.imagePath) as XFile);
-
-                                   if (result[0] == "Error") {
-                                     // Handle the error, maybe show a SnackBar
-                                     _showSnackBar('Error: ${result[1]}');
-                                   } else {
-                                     Navigator.push(
-                                       context,
-                                       MaterialPageRoute(
-                                         builder: (context) => TableDisplayPage(
-                                           parsedData: [result], // Pass the re-extracted data
-                                           images: [XFile(item.imagePath)],
-                                         ),
-                                       ),
-                                     );
-                                   }
-                                 },
-                                 child: Card(
-                                  margin: const EdgeInsets.all(8.0),
-                                  child: Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                              children: [
-                                                SizedBox(
-                                                  height: 60,
-                                                  width: 60,
-                                                    child: Image.file(File(item.imagePath), fit: BoxFit.cover,),
-                                                  ),
-                                                  Row(
-                                                    children: [
-                                                        IconButton(
-                                                          icon: const Icon(Icons.save_alt, color: Colors.blue,),
-                                                          onPressed: () => _exportConversionToCsv(item),
-                                                        ),
-                                                        IconButton(
-                                                          icon: const Icon(Icons.delete, color: Colors.blue,),
-                                                          onPressed: () => _deleteConversion(item),
-                                                        ),
-                                                      ],
-                                                  ),
-                                               ],
-                                            ),
-                                             ConstrainedBox(
-                                              constraints: const BoxConstraints(maxHeight: 80),
-                                                child: Text('Extracted Text: ${item.extractedText}', style: const TextStyle(color: Colors.blue), overflow: TextOverflow.ellipsis,),
-                                             ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                );
-                             },
-                            );
-                          }
-                  },
-                );
-      },
-    );
-  }
-
-
-   @override
+ @override
   Widget build(BuildContext context) {
     final images = ref.watch(imagesProvider);
     final extractedText = ref.watch(extractedTextProvider);
     final isLoading = ref.watch(loadingStateProvider);
 
       return Scaffold(
-      key: _scaffoldKey,
+        key: _scaffoldKey,
       appBar: CustomAppBar(title: 'Image to Text Converter'),
-       body: Padding(
-         padding: const EdgeInsets.all(16.0),
-         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-             ElevatedButton(
-                onPressed: _pickImage,
-                 style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(100, 300),
-                    backgroundColor: Colors.white,
-                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+       body: SingleChildScrollView(
+         child: Stack(
+           children: [
+             Padding(
+               padding: const EdgeInsets.all(16.0),
+               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ElevatedButton(
+                      onPressed: _pickImage,
+                       style: ElevatedButton.styleFrom(
+                         minimumSize: const Size(100, 300),
+                          backgroundColor: Colors.white,
+                         shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                      ),
-                 ),
-                child: const Icon(Icons.add, size: 60, color: Colors.blue),
-              ),
-             const SizedBox(height: 16),
-              if (images.isNotEmpty)
-              Expanded(child: _buildImageGrid()),
-              const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _extractTextFromImages,
-              child: const Text('Extract Text', style: TextStyle(color: Colors.blue),),
-            ),
-            const SizedBox(height: 16),
-            if (isLoading) LoadingIndicator(),
-             Expanded(
-              child: Align(
-                 alignment: Alignment.bottomCenter,
-                  child:  Padding(
-                      padding: const EdgeInsets.only(bottom: 80.0),
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                         child:  GestureDetector(
-                            onVerticalDragUpdate: (details) {
-                              if (details.delta.dy < -5) {
-                                 _showHistoryBottomSheet(context);
-                               }
-                            },
-                             child: const Text(
-                             "Drag from bottom to see history",
-                               style: TextStyle(color: Colors.blue, fontWeight: FontWeight.w400, fontSize: 16),
-                             ),
-                            ),
+                       child: _imageFile != null
+                             ? SizedBox(
+                               width: 100,
+                                height: 100,
+                                  child:  Image.file(
+                                    _imageFile!,
+                                      fit: BoxFit.cover,
+                                    ),
+                             )
+                           : const Icon(Icons.add, size: 60, color: Colors.blue),
                        ),
+                      const SizedBox(height: 16),
+                      if (images.isNotEmpty)
+                       SizedBox(
+                          height: 150,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                               itemCount: images.length,
+                                itemBuilder: (context, index) {
+                                  final image = images[index];
+                                    return SizedBox(
+                                    width: 150,
+                                       child:  Image.file(
+                                          File(image.path),
+                                           fit: BoxFit.cover,
+                                        ),
+                                    );
+                                },
+                             ),
+                          ),
+                     const SizedBox(height: 16),
+                      TextField(
+                        controller: _instructionController,
+                         style: const TextStyle(color: Colors.blue),
+                          decoration: const InputDecoration(
+                           labelText: 'Instruction to Extract',
+                             border: OutlineInputBorder(
+                               borderSide: BorderSide(color: Colors.blue)
+                             ),
+                            focusedBorder: OutlineInputBorder(
+                             borderSide: BorderSide(color: Colors.blue)
+                            ),
+                         ),
+                         maxLines: null,
+                      ),
+                    const SizedBox(height: 16),
+                   ElevatedButton(
+                     onPressed: _extractTextFromImages,
+                     child: const Text('Extract Text', style: TextStyle(color: Colors.blue),),
                    ),
-                 ),
+                     const SizedBox(height: 16),
+                      
+                   if (extractedText.isNotEmpty)
+                      ElevatedButton(
+                         onPressed: _exportToCsv,
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.blue,),
+                       child: const Text('Export to CSV', style: TextStyle(color: Colors.white),),
+                    ),
+                  ],
+                ),),
+               if (isLoading)
+               Center(
+                  child: LoadingIndicator(), // Loading indicator is in Center
+                ),
+            ],
            ),
-          ],
-        ),
-       ),
-    );
+         ),
+      );
   }
 }
