@@ -55,7 +55,7 @@ class _MainScreenState extends State<MainScreen> {
     super.initState();
     _pages = [
       const HomePage(),
-      LearningPage(),
+      // LearningPage(),
       const HistoryPage(),
       const SettingsPage(),
     ];
@@ -95,11 +95,6 @@ class _MainScreenState extends State<MainScreen> {
                 inActiveItem: const Icon(Icons.home_outlined, color: Colors.grey,),
                 activeItem: const Icon(Icons.home, color: Colors.white,),
                 itemLabel: 'Home',
-              ),
-              BottomBarItem(
-                inActiveItem: const Icon(Icons.school_outlined, color: Colors.grey),
-                activeItem: const Icon(Icons.school, color: Colors.white,),
-                itemLabel: 'Learning',
               ),
                BottomBarItem(
                 inActiveItem: const Icon(Icons.history_outlined, color: Colors.grey),
