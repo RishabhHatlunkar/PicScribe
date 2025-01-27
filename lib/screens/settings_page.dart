@@ -28,19 +28,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _fetchAvailableModels();
   }
 
- Future<void> _fetchAvailableModels() async {
-      setState(() {
-        _isLoading = true;
-        _availableModels = [];
-      });
-      final apiKey = ref.read(apiKeyProvider);
+  Future<void> _fetchAvailableModels() async {
+    setState(() {
+      _isLoading = true;
+      _availableModels = [];
+    });
+    final apiKey = ref.read(apiKeyProvider);
 
     if (apiKey == null || apiKey.isEmpty) {
-       setState(() {
+      if (!mounted) return; // Check if the widget is still mounted
+      setState(() {
         _availableModels = ['API Key not set'];
         _isLoading = false;
-         _selectedModel = null;
-             ref.read(geminiModelProvider.notifier).state = null;
+        _selectedModel = null;
+        ref.read(geminiModelProvider.notifier).state = null;
       });
       return;
     }
@@ -55,80 +56,64 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             .where((name) => name.startsWith('models/gemini'))
             .toList();
 
-          models.sort((a, b) {
-                // Extract version parts from both strings
-               final aVersion = a.split('/').last;
-               final bVersion = b.split('/').last;
+        models.sort((a, b) {
+          final aVersion = a.split('/').last;
+          final bVersion = b.split('/').last;
 
+          final aParts = aVersion.split('-');
+          final bParts = bVersion.split('-');
 
-              // Split string by hyphen
-               final aParts = aVersion.split('-');
-                final bParts = bVersion.split('-');
-
-
-               // Compare by comparing numeric components if available
-               for (int i = 0; i < aParts.length && i < bParts.length; i++) {
-                   // Check if the parts are numbers
-                   if (int.tryParse(aParts[i]) != null && int.tryParse(bParts[i]) != null) {
-                       final int aNum = int.parse(aParts[i]);
-                        final int bNum = int.parse(bParts[i]);
-                      // Compare numerical components
-                      if (aNum != bNum) {
-                          return bNum.compareTo(aNum); // If difference is found compare by numerical values in descending order
-                      }
-                    }
-                     else {
-                    // Compare String components for alphabets
-                     final int strCompare = bParts[i].compareTo(aParts[i]);
-                      if(strCompare != 0) return strCompare;
-                 }
-             }
-                // Compare by length of the string
-                  return bVersion.length.compareTo(aVersion.length);
-
-              });
-            String? defaultModel;
-         if (models.contains('models/gemini-2.0-flash-exp')){
-                defaultModel = 'models/gemini-2.0-flash-exp';
-             }
-            else if (models.isNotEmpty){
-            defaultModel = models.first;
-
+          for (int i = 0; i < aParts.length && i < bParts.length; i++) {
+            if (int.tryParse(aParts[i]) != null && int.tryParse(bParts[i]) != null) {
+              final int aNum = int.parse(aParts[i]);
+              final int bNum = int.parse(bParts[i]);
+              if (aNum != bNum) {
+                return bNum.compareTo(aNum);
+              }
+            } else {
+              final int strCompare = bParts[i].compareTo(aParts[i]);
+              if (strCompare != 0) return strCompare;
+            }
           }
-
-        setState(() {
-          _availableModels = models;
-           _isLoading = false;
-           if(_selectedModel == null || !_availableModels.contains(_selectedModel))
-           {
-             if(defaultModel != null)
-               {
-                 _selectedModel = defaultModel;
-                  ref.read(geminiModelProvider.notifier).state = _selectedModel;
-               }else {
-                  _selectedModel = null;
-                   ref.read(geminiModelProvider.notifier).state = null;
-                }
-           }
+          return bVersion.length.compareTo(aVersion.length);
         });
 
+        String? defaultModel;
+        if (models.contains('models/gemini-2.0-flash-exp')) {
+          defaultModel = 'models/gemini-2.0-flash-exp';
+        } else if (models.isNotEmpty) {
+          defaultModel = models.first;
+        }
+
+        if (!mounted) return; // Check if the widget is still mounted
+        setState(() {
+          _availableModels = models;
+          _isLoading = false;
+          if (_selectedModel == null || !_availableModels.contains(_selectedModel)) {
+            _selectedModel = defaultModel;
+            ref.read(geminiModelProvider.notifier).state = _selectedModel;
+          }
+        });
       } else {
+        if (!mounted) return; // Check if the widget is still mounted
         setState(() {
           _availableModels = ['Failed to load models'];
           _isLoading = false;
-           _selectedModel = null;
-            ref.read(geminiModelProvider.notifier).state = null;
+          _selectedModel = null;
+          ref.read(geminiModelProvider.notifier).state = null;
         });
       }
     } catch (e) {
+      if (!mounted) return; // Check if the widget is still mounted
       setState(() {
         _availableModels = ['Error: ${e.toString()}'];
-         _isLoading = false;
-          _selectedModel = null;
-          ref.read(geminiModelProvider.notifier).state = null;
+        _isLoading = false;
+        _selectedModel = null;
+        ref.read(geminiModelProvider.notifier).state = null;
       });
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
