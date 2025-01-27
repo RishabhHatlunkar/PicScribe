@@ -135,7 +135,9 @@ class _HistoryPageState extends ConsumerState<HistoryPage>
             colors: [
               // Colors.pinkAccent,
               Colors.white70,
-              Colors.pink[50]!,
+              Colors.white70,
+              Colors.blue.shade500,
+              Colors.purple.shade500
             ],
           ),
         ),

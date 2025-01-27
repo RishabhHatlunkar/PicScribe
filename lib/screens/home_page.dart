@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -20,17 +21,32 @@ class HomePage extends ConsumerStatefulWidget {
   ConsumerState<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends ConsumerState<HomePage> {
+class _HomePageState extends ConsumerState<HomePage> with SingleTickerProviderStateMixin {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final TextEditingController _instructionController = TextEditingController();
   File? _imageFile;
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
 
   @override
   void initState() {
     super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkApiKeyAndShowDialog();
     });
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
   Future<void> _checkApiKeyAndShowDialog() async {
@@ -205,91 +221,253 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   Widget build(BuildContext context) {
     final images = ref.watch(imagesProvider);
-    final extractedText = ref.watch(extractedTextProvider);
     final isLoading = ref.watch(loadingStateProvider);
-    FocusNode _focusNode = FocusNode();
+    final size = MediaQuery.of(context).size;
 
     return Scaffold(
       key: _scaffoldKey,
-      appBar: CustomAppBar(title: 'Image to Text Converter'),
-      body:  isLoading
-          ?  Center(
-              child: LoadingIndicator(), // Show loading indicator instead of content
-            )
-          : SingleChildScrollView(
-        child: Padding(
-            padding: const EdgeInsets.all(16.0),
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text(
+          'PicScribe 📜',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 24,
+          ),
+        ),
+        flexibleSpace: ClipRRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              color: Colors.transparent,
+            ),
+          ),
+        ),
+      ),
+      body: Container(
+        height: size.height,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.blue.shade900,
+              Colors.blue.shade500,
+              Colors.purple.shade500,
+            ],
+          ),
+        ),
+        child: isLoading
+            ? Center(child: LoadingIndicator())
+            : SafeArea(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ElevatedButton(
-                    onPressed: _showImageSourceOptions,
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(100, 300),
-                      backgroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  AnimatedBuilder(
+                    animation: _scaleAnimation,
+                    builder: (context, child) => Transform.scale(
+                      scale: _scaleAnimation.value,
+                      child: GestureDetector(
+                        onTapDown: (_) => _animationController.forward(),
+                        onTapUp: (_) => _animationController.reverse(),
+                        onTapCancel: () => _animationController.reverse(),
+                        child: _buildImagePickerCard(size),
                       ),
                     ),
-                    child: _imageFile != null
-                        ? Container(
-                                                height: 200,
-                                                width: 200,
-                                                decoration: BoxDecoration(
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
-                                                  boxShadow: [
-                                                    BoxShadow(
-                                                      color: Colors.black
-                                                          .withOpacity(0.1),
-                                                      blurRadius: 8,
-                                                      offset: const Offset(0, 2),
-                                                    ),
-                                                  ],
-                                                ),
-                                                child: ClipRRect(
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
-                                                  child: Image.file(
-                                                    _imageFile!,
-                                                    fit: BoxFit.cover,
-                                                  ),
-                                                ),
-                                              )
-                        : const Icon(Icons.add, size: 60, color: Colors.blue),
                   ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _instructionController,
-                    focusNode: _focusNode,
-                    style: const TextStyle(color: Color.fromARGB(255, 60, 60, 60)),
-                    cursorColor: Color.fromARGB(255, 60, 60, 60),
-                    decoration: InputDecoration(
-                      labelText: 'Instruction to Extract',
-                      labelStyle: const TextStyle(
-                        color: Color.fromARGB(255, 60, 60, 60),
-                      ),
-                      border: const OutlineInputBorder(
-                        borderSide:
-                            BorderSide(color: Color.fromARGB(255, 0, 0, 0)),
-                      ),
-                      focusedBorder: const OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.blue),
-                      ),
-                    ),
-                    maxLines: null,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _extractTextFromImages,
-                    child: const Text(
-                      'Extract Text',
-                      style: TextStyle(color: Colors.blue),
-                    ),
-                  ),
+                  const SizedBox(height: 24),
+                  _buildInstructionCard(),
+                  const SizedBox(height: 24),
+                  _buildExtractButton(),
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImagePickerCard(Size size) {
+    return Card(
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: InkWell(
+        onTap: _showImageSourceOptions,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          height: size.height * 0.4,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white.withOpacity(0.9),
+                Colors.white.withOpacity(0.7),
+              ],
+            ),
+          ),
+          child: _imageFile != null
+              ? ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.file(
+                  _imageFile!,
+                  fit: BoxFit.cover,
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Colors.black.withOpacity(0.6),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+                const Positioned(
+                  bottom: 16,
+                  left: 16,
+                  child: Text(
+                    'Tap to change image',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+              : Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.blue.withOpacity(0.1),
+                ),
+                child: const Icon(
+                  Icons.add_photo_alternate_rounded,
+                  size: 64,
+                  color: Colors.blue,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Tap to add an image',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.blue,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInstructionCard() {
+    return Card(
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white.withOpacity(0.9),
+              Colors.white.withOpacity(0.7),
+            ],
+          ),
+        ),
+        child: TextField(
+          controller: _instructionController,
+          style: const TextStyle(
+            color: Colors.black87,
+            fontSize: 16,
+          ),
+          decoration: InputDecoration(
+            labelText: 'Additonal Instructions',
+            labelStyle: TextStyle(
+              color: Colors.blue.shade900,
+              fontWeight: FontWeight.w500,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(15),
+              borderSide: BorderSide(color: Colors.blue.shade200),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(15),
+              borderSide: BorderSide(color: Colors.blue.shade900, width: 2),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(15),
+              borderSide: BorderSide(color: Colors.blue.shade200),
+            ),
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.5),
+          ),
+          maxLines: null,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExtractButton() {
+    return Card(
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: Colors.white)),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.blue.shade600,
+              Colors.purple.shade500,
+            ],
+          ),
+        ),
+        child: ElevatedButton(
+          onPressed: _extractTextFromImages,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 16),
+          ),
+          child: const Text(
+            'Extract Text',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
       ),
     );
   }
