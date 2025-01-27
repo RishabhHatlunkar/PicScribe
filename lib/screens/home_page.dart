@@ -52,7 +52,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       setState(() {
         _imageFile = savedImage;
       });
-      ref.read(imagesProvider.notifier).state = [XFile(savedImage.path)];
+      ref.read(imagesProvider.notifier).state = [XFile(savedImage.path)]; // Store the selected image in list
     }
   }
 
@@ -63,9 +63,15 @@ class _HomePageState extends ConsumerState<HomePage> {
     final instruction = _instructionController.text;
 
     if (images.isEmpty) {
-      _showSnackBar('Please select images first.');
+      _showSnackBar('Please select an image first.');
       return;
     }
+
+     if (images.length > 1) {
+      _showSnackBar('Please select only one image.');
+      return;
+    }
+
 
     if (apiKey == null || apiKey.isEmpty) {
       _showApiKeyDialog();
@@ -77,26 +83,25 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     try {
       List<dynamic> parsedData = [];
-      for (var image in images) {
-        // Use the geminiService instance to call extractTextFromImage
+      // since there is one image we get the first one from the list
+        var image = images[0];
         final result =
             await geminiService.extractTextFromImage(image, instruction);
 
         if (result[0] == "Error") {
           throw Exception(result[1]);
         }
-        parsedData.add(result[1]);
+        parsedData.add(result[1]); // Here I am taking the text directly and sending it
         final conversionItem = ConversionItem(
-          imagePath: image.path,
-          extractedText: result[1] is String
-              ? result[1]
-              : const ListToCsvConverter().convert(result[1]),
-          timestamp: DateTime.now(),
-          instruction: instruction,
-        );
-        await ref.read(saveConversionProvider(conversionItem).future);
-      }
-      // Update the provider with the parsed data
+            imagePath: image.path,
+            extractedText: result[1] is String
+                ? result[1]
+                : const ListToCsvConverter().convert(result[1]),
+            timestamp: DateTime.now(),
+            instruction: instruction,
+            );
+          await ref.read(saveConversionProvider(conversionItem).future);
+       // Update the provider with the parsed data
       ref.read(parsedDataProvider.notifier).state = parsedData;
       if (_scaffoldKey.currentContext != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -167,7 +172,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   void _showImageSourceOptions() {
-     if (_scaffoldKey.currentContext == null) return;
+    if (_scaffoldKey.currentContext == null) return;
     showModalBottomSheet(
       context: _scaffoldKey.currentContext!,
       builder: (BuildContext context) {
@@ -187,7 +192,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 leading: const Icon(Icons.camera_alt),
                 title: const Text('Take a Photo'),
                 onTap: () {
-                   Navigator.pop(context);
+                  Navigator.pop(context);
                   _pickImage(ImageSource.camera);
                 },
               ),
@@ -207,11 +212,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     return Scaffold(
       key: _scaffoldKey,
       appBar: CustomAppBar(title: 'Image to Text Converter'),
-      body: SingleChildScrollView(
-        child: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
+      body:  isLoading
+          ?  Center(
+              child: LoadingIndicator(), // Show loading indicator instead of content
+            )
+          : SingleChildScrollView(
+        child: Padding(
+            padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -225,14 +232,30 @@ class _HomePageState extends ConsumerState<HomePage> {
                       ),
                     ),
                     child: _imageFile != null
-                        ? SizedBox(
-                            width: 100,
-                            height: 100,
-                            child: Image.file(
-                              _imageFile!,
-                              fit: BoxFit.cover,
-                            ),
-                          )
+                        ? Container(
+                                                height: 200,
+                                                width: 200,
+                                                decoration: BoxDecoration(
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: Colors.black
+                                                          .withOpacity(0.1),
+                                                      blurRadius: 8,
+                                                      offset: const Offset(0, 2),
+                                                    ),
+                                                  ],
+                                                ),
+                                                child: ClipRRect(
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                  child: Image.file(
+                                                    _imageFile!,
+                                                    fit: BoxFit.cover,
+                                                  ),
+                                                ),
+                                              )
                         : const Icon(Icons.add, size: 60, color: Colors.blue),
                   ),
                   const SizedBox(height: 16),
@@ -267,12 +290,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ],
               ),
             ),
-            if (isLoading)
-              Center(
-                child: LoadingIndicator(), // Loading indicator is in Center
-              ),
-          ],
-        ),
       ),
     );
   }
