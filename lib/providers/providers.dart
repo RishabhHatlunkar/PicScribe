@@ -23,10 +23,11 @@ final loadingStateProvider = StateProvider<bool>((ref) => false);
 // Gemini Service Provider
 final geminiServiceProvider = Provider<GeminiService>((ref) {
     final apiKey = ref.watch(apiKeyProvider);
+    final modelName = ref.watch(geminiModelProvider);
     if (apiKey == null || apiKey.isEmpty) {
-        return GeminiService(''); // Return a GeminiService with an empty API key
+        return GeminiService('', modelName); // Return a GeminiService with an empty API key
     }
-    return GeminiService(apiKey);
+    return GeminiService(apiKey, modelName);
 });
 
 

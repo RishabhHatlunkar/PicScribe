@@ -11,8 +11,9 @@ import 'package:pixelsheet/providers/providers.dart';
 
 class GeminiService {
   final String apiKey;
+  final String? modelName;
 
-  GeminiService(this.apiKey);
+  GeminiService(this.apiKey, this.modelName);
 
   // Function to parse the Gemini API response
   List<dynamic> parseGeminiResponse(String rawString) {
@@ -38,7 +39,7 @@ class GeminiService {
 
   Future<List<dynamic>> extractTextFromImage(XFile imageFile, String instruction) async {
      try {
-      final model = GenerativeModel(model: 'gemini-2.0-flash-exp', apiKey: apiKey);
+      final model = GenerativeModel(model: modelName ?? 'gemini-2.0-flash-exp', apiKey: apiKey);
        final promptTemplate = await _loadTemplate('lib/templates/prompt.jinja2');
       final template = jj.Template(promptTemplate);
       final prompt = template.render({'instruction': instruction});
