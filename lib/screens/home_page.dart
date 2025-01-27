@@ -13,7 +13,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pixelsheet/screens/table_display_page.dart';
 import 'package:csv/csv.dart';
 
-
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
@@ -29,20 +28,20 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   void initState() {
     super.initState();
-     WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkApiKeyAndShowDialog();
     });
   }
 
   Future<void> _checkApiKeyAndShowDialog() async {
-      if (ref.read(apiKeyProvider) == null) {
-       _showApiKeyDialog();
-       }
+    if (ref.read(apiKeyProvider) == null) {
+      _showApiKeyDialog();
+    }
   }
 
-  Future<void> _pickImage() async {
+  Future<void> _pickImage(ImageSource source) async {
     final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    final XFile? image = await picker.pickImage(source: source);
 
     if (image != null) {
       final appDir = await getApplicationDocumentsDirectory();
@@ -50,9 +49,9 @@ class _HomePageState extends ConsumerState<HomePage> {
       final savedImage = File(join(appDir.path, fileName));
 
       await File(image.path).copy(savedImage.path);
-       setState(() {
-          _imageFile = savedImage;
-       });
+      setState(() {
+        _imageFile = savedImage;
+      });
       ref.read(imagesProvider.notifier).state = [XFile(savedImage.path)];
     }
   }
@@ -60,8 +59,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _extractTextFromImages() async {
     final images = ref.read(imagesProvider);
     final apiKey = ref.read(apiKeyProvider);
-    final geminiService =
-    ref.read(geminiServiceProvider);
+    final geminiService = ref.read(geminiServiceProvider);
     final instruction = _instructionController.text;
 
     if (images.isEmpty) {
@@ -81,33 +79,36 @@ class _HomePageState extends ConsumerState<HomePage> {
       List<dynamic> parsedData = [];
       for (var image in images) {
         // Use the geminiService instance to call extractTextFromImage
-        final result = await geminiService.extractTextFromImage(image, instruction);
+        final result =
+            await geminiService.extractTextFromImage(image, instruction);
 
         if (result[0] == "Error") {
           throw Exception(result[1]);
         }
-         parsedData.add(result[1]); // Here I am taking the text directly and sending it
+        parsedData.add(result[1]);
         final conversionItem = ConversionItem(
-            imagePath: image.path,
-            extractedText: result[1] is String ? result[1] : const ListToCsvConverter().convert(result[1]),
-            timestamp: DateTime.now(),
-            instruction: instruction,
-            );
-          await ref.read(saveConversionProvider(conversionItem).future);
+          imagePath: image.path,
+          extractedText: result[1] is String
+              ? result[1]
+              : const ListToCsvConverter().convert(result[1]),
+          timestamp: DateTime.now(),
+          instruction: instruction,
+        );
+        await ref.read(saveConversionProvider(conversionItem).future);
       }
       // Update the provider with the parsed data
       ref.read(parsedDataProvider.notifier).state = parsedData;
-      if(_scaffoldKey.currentContext != null)
-      {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            ref.read(imagesProvider.notifier).state = [];
+      if (_scaffoldKey.currentContext != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(imagesProvider.notifier).state = [];
           Navigator.push(
-               _scaffoldKey.currentContext!,
-            MaterialPageRoute(
-               builder: (context) => TableDisplayPage(
-                  images: images, parsedData: parsedData,
-               ),
-            ));
+              _scaffoldKey.currentContext!,
+              MaterialPageRoute(
+                builder: (context) => TableDisplayPage(
+                  images: images,
+                  parsedData: parsedData,
+                ),
+              ));
         });
       }
     } catch (e) {
@@ -121,7 +122,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   void _showApiKeyDialog() {
-     if (_scaffoldKey.currentContext == null) return;
+    if (_scaffoldKey.currentContext == null) return;
     showDialog(
       context: _scaffoldKey.currentContext!,
       builder: (context) {
@@ -133,12 +134,13 @@ class _HomePageState extends ConsumerState<HomePage> {
       },
     );
   }
+
   Future<void> _exportToCsv() async {
     final extractedText = ref.read(extractedTextProvider);
     final images = ref.read(imagesProvider);
 
     if (extractedText.isEmpty) {
-        _showSnackBar('No text extracted to export.');
+      _showSnackBar('No text extracted to export.');
       return;
     }
 
@@ -152,111 +154,126 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     try {
       String message = await CsvService.exportToCsv(csvData, 'image_text');
-         _showSnackBar(message);
+      _showSnackBar(message);
     } catch (e) {
-          _showSnackBar( 'Error saving CSV: $e');
+      _showSnackBar('Error saving CSV: $e');
     }
   }
 
-    
   void _showSnackBar(String message) {
-      if (_scaffoldKey.currentContext == null) return;
-       ScaffoldMessenger.of(_scaffoldKey.currentContext!).showSnackBar(SnackBar(
-              content: Text(message, style: const TextStyle(color: Colors.blue))));
+    if (_scaffoldKey.currentContext == null) return;
+    ScaffoldMessenger.of(_scaffoldKey.currentContext!).showSnackBar(SnackBar(
+        content: Text(message, style: const TextStyle(color: Colors.blue))));
   }
- @override
+
+  void _showImageSourceOptions() {
+     if (_scaffoldKey.currentContext == null) return;
+    showModalBottomSheet(
+      context: _scaffoldKey.currentContext!,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Pick from Gallery'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Take a Photo'),
+                onTap: () {
+                   Navigator.pop(context);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  @override
   Widget build(BuildContext context) {
     final images = ref.watch(imagesProvider);
     final extractedText = ref.watch(extractedTextProvider);
     final isLoading = ref.watch(loadingStateProvider);
     FocusNode _focusNode = FocusNode();
 
-      return Scaffold(
-        key: _scaffoldKey,
+    return Scaffold(
+      key: _scaffoldKey,
       appBar: CustomAppBar(title: 'Image to Text Converter'),
-       body: SingleChildScrollView(
-         child: Stack(
-           children: [
-             Padding(
-               padding: const EdgeInsets.all(16.0),
-               child: Column(
+      body: SingleChildScrollView(
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    ElevatedButton(
-                      onPressed: _pickImage,
-                       style: ElevatedButton.styleFrom(
-                         minimumSize: const Size(100, 300),
-                          backgroundColor: Colors.white,
-                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                     ),
-                       child: _imageFile != null
-                             ? SizedBox(
-                               width: 100,
-                                height: 100,
-                                  child:  Image.file(
-                                    _imageFile!,
-                                      fit: BoxFit.cover,
-                                    ),
-                             )
-                           : const Icon(Icons.add, size: 60, color: Colors.blue),
-                       ),
-                      const SizedBox(height: 16),
-                      // if (images.isNotEmpty)
-                      //  SizedBox(
-                      //     height: 150,
-                      //       child: ListView.builder(
-                      //         scrollDirection: Axis.horizontal,
-                      //          itemCount: images.length,
-                      //           itemBuilder: (context, index) {
-                      //             final image = images[index];
-                      //               return SizedBox(
-                      //               width: 150,
-                      //                  child:  Image.file(
-                      //                     File(image.path),
-                      //                      fit: BoxFit.cover,
-                      //                   ),
-                      //               );
-                      //           },
-                      //        ),
-                      //     ),
-                    //  const SizedBox(height: 16),
-
-                    TextField(
-                      controller: _instructionController,
-                      focusNode: _focusNode,
-                      style: const TextStyle(color: Color.fromARGB(255, 60, 60, 60)),
-                      cursorColor: Color.fromARGB(255, 60, 60, 60),
-                      decoration: InputDecoration(
-                        labelText: 'Instruction to Extract',
-                        labelStyle: TextStyle(
-                          color: Color.fromARGB(255, 60, 60, 60),
-                        ),
-                        border: OutlineInputBorder(
-                          borderSide: BorderSide(color: Color.fromARGB(255, 0, 0, 0)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.blue),
-                        ),
+                children: [
+                  ElevatedButton(
+                    onPressed: _showImageSourceOptions,
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(100, 300),
+                      backgroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      maxLines: null,
                     ),
-
-                    const SizedBox(height: 16),
-                   ElevatedButton(
-                     onPressed: _extractTextFromImages,
-                     child: const Text('Extract Text', style: TextStyle(color: Colors.blue),),
-                   ),
-                  ],
-                ),),
-               if (isLoading)
-               Center(
-                  child: LoadingIndicator(), // Loading indicator is in Center
-                ),
-            ],
-           ),
-         ),
-      );
+                    child: _imageFile != null
+                        ? SizedBox(
+                            width: 100,
+                            height: 100,
+                            child: Image.file(
+                              _imageFile!,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : const Icon(Icons.add, size: 60, color: Colors.blue),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _instructionController,
+                    focusNode: _focusNode,
+                    style: const TextStyle(color: Color.fromARGB(255, 60, 60, 60)),
+                    cursorColor: Color.fromARGB(255, 60, 60, 60),
+                    decoration: InputDecoration(
+                      labelText: 'Instruction to Extract',
+                      labelStyle: const TextStyle(
+                        color: Color.fromARGB(255, 60, 60, 60),
+                      ),
+                      border: const OutlineInputBorder(
+                        borderSide:
+                            BorderSide(color: Color.fromARGB(255, 0, 0, 0)),
+                      ),
+                      focusedBorder: const OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.blue),
+                      ),
+                    ),
+                    maxLines: null,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _extractTextFromImages,
+                    child: const Text(
+                      'Extract Text',
+                      style: TextStyle(color: Colors.blue),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isLoading)
+              Center(
+                child: LoadingIndicator(), // Loading indicator is in Center
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }
