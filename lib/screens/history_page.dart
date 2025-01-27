@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:pixelsheet/models/conversion_item.dart';
+import 'package:pixelsheet/screens/table_display_page.dart';
 import 'package:pixelsheet/widgets/custom_app_bar.dart';
 import 'package:pixelsheet/services/csv_service.dart';
 import 'package:pixelsheet/providers/providers.dart';
@@ -86,40 +88,45 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
               itemCount: snapshot.data!.length,
               itemBuilder: (context, index) {
                 ConversionItem item = snapshot.data![index];
-                return Card(
-                     margin: const EdgeInsets.all(8.0),
-                    child: Padding(
-                     padding: const EdgeInsets.all(8.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                       SizedBox(
-                                          height: 60,
-                                          width: 60,
-                                          child: Image.file(File(item.imagePath), fit: BoxFit.cover,),
-                                        ),
-                                       Row(
-                                           children: [
-                                                IconButton(
-                                                  icon: const Icon(Icons.save_alt, color: Colors.blue,),
-                                                  onPressed: () => _exportConversionToCsv(item),
-                                                ),
-                                                 IconButton(
-                                                   icon: const Icon(Icons.delete, color: Colors.blue,),
-                                                    onPressed: () => _deleteConversion(item),
+                return GestureDetector(
+                  onTap: () async  { 
+                    MaterialPageRoute(builder: (context) => TableDisplayPage(parsedData: [item.extractedText],images: [XFile(item.imagePath)],),);
+                  },
+                  child: Card(
+                       margin: const EdgeInsets.all(8.0),
+                      child: Padding(
+                       padding: const EdgeInsets.all(8.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                               Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                         SizedBox(
+                                            height: 60,
+                                            width: 60,
+                                            child: Image.file(File(item.imagePath), fit: BoxFit.cover,),
+                                          ),
+                                         Row(
+                                             children: [
+                                                  IconButton(
+                                                    icon: const Icon(Icons.save_alt, color: Colors.blue,),
+                                                    onPressed: () => _exportConversionToCsv(item),
                                                   ),
-                                              ],
-                                        ),
-                                   ],
-                              ),
-                             Text('Extracted Text: ${item.extractedText}', style: const TextStyle(color: Colors.blue)),
-                            Text('Instruction: ${item.instruction}', style: const TextStyle(color: Colors.blue)),
-                           ],
-                      ),
-                     ),
+                                                   IconButton(
+                                                     icon: const Icon(Icons.delete, color: Colors.blue,),
+                                                      onPressed: () => _deleteConversion(item),
+                                                    ),
+                                                ],
+                                          ),
+                                     ],
+                                ),
+                               Text('Extracted Text: ${item.extractedText}', style: const TextStyle(color: Colors.blue)),
+                              Text('Instruction: ${item.instruction}', style: const TextStyle(color: Colors.blue)),
+                             ],
+                        ),
+                       ),
+                  ),
                 );
              },
             );

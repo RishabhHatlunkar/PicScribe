@@ -57,12 +57,12 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-    Future<void> _extractTextFromImages() async {
+  Future<void> _extractTextFromImages() async {
     final images = ref.read(imagesProvider);
     final apiKey = ref.read(apiKeyProvider);
     final geminiService =
     ref.read(geminiServiceProvider);
-     final instruction = _instructionController.text;
+    final instruction = _instructionController.text;
 
     if (images.isEmpty) {
       _showSnackBar('Please select images first.');
@@ -86,36 +86,30 @@ class _HomePageState extends ConsumerState<HomePage> {
         if (result[0] == "Error") {
           throw Exception(result[1]);
         }
-        parsedData.add(result);
-       final conversionItem = ConversionItem(
+         parsedData.add(result[1]); // Here I am taking the text directly and sending it
+        final conversionItem = ConversionItem(
             imagePath: image.path,
             extractedText: result[1] is String ? result[1] : const ListToCsvConverter().convert(result[1]),
             timestamp: DateTime.now(),
-            instruction: instruction
+            instruction: instruction,
             );
-        await ref.read(saveConversionProvider(conversionItem).future);
+          await ref.read(saveConversionProvider(conversionItem).future);
       }
       // Update the provider with the parsed data
       ref.read(parsedDataProvider.notifier).state = parsedData;
-       setState(() {
-          _imageFile = null;
-          _instructionController.clear();
-        });
-
-         if(_scaffoldKey.currentContext != null)
-        {
-           WidgetsBinding.instance.addPostFrameCallback((_) {
+      if(_scaffoldKey.currentContext != null)
+      {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
             ref.read(imagesProvider.notifier).state = [];
           Navigator.push(
-              _scaffoldKey.currentContext!,
+               _scaffoldKey.currentContext!,
             MaterialPageRoute(
-              builder: (context) => TableDisplayPage(
-               parsedData: parsedData,
-                 images: images,
-                ),
+               builder: (context) => TableDisplayPage(
+                  images: images, parsedData: parsedData,
+               ),
             ));
-         });
-        }
+        });
+      }
     } catch (e) {
       print('Error extracting text: $e');
       _showSnackBar('Error extracting text: $e');
