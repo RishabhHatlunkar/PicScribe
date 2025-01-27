@@ -18,7 +18,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   String? _selectedModel;
   List<String> _availableModels = [];
   bool _isLoading = false;
-   final _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _isApiKeyVisible = false;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -64,7 +65,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           final bParts = bVersion.split('-');
 
           for (int i = 0; i < aParts.length && i < bParts.length; i++) {
-            if (int.tryParse(aParts[i]) != null && int.tryParse(bParts[i]) != null) {
+            if (int.tryParse(aParts[i]) != null &&
+                int.tryParse(bParts[i]) != null) {
               final int aNum = int.parse(aParts[i]);
               final int bNum = int.parse(bParts[i]);
               if (aNum != bNum) {
@@ -89,7 +91,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         setState(() {
           _availableModels = models;
           _isLoading = false;
-          if (_selectedModel == null || !_availableModels.contains(_selectedModel)) {
+          if (_selectedModel == null ||
+              !_availableModels.contains(_selectedModel)) {
             _selectedModel = defaultModel;
             ref.read(geminiModelProvider.notifier).state = _selectedModel;
           }
@@ -114,76 +117,92 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
-      return Scaffold(
-        key: _scaffoldKey,
-        appBar: CustomAppBar(title: 'Settings'),
-        body: IgnorePointer(
-             ignoring: _isLoading,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Stack(
-                  children: [
-                   Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                         TextField(
-                           controller: _apiKeyController,
-                          decoration: const InputDecoration(
-                           labelText: 'Gemini API Key',
-                              border: OutlineInputBorder(),
-                           ),
-                           onChanged: (value) {
-                            ref.read(apiKeyProvider.notifier).state = value;
-                            _fetchAvailableModels();
-                          },
-                         ),
-                        const SizedBox(height: 16),
-                        DropdownButtonFormField<String>(
-                            value: _selectedModel,
-                            decoration: const InputDecoration(
-                               labelText: 'Gemini Model',
-                                border: OutlineInputBorder(),
-                             ),
-                            items: _availableModels.map<DropdownMenuItem<String>>(
-                                (String value) {
-                                 return DropdownMenuItem<String>(
-                                  value: value,
-                                  child: Text(value),
-                                 );
-                              },
-                            ).toList(),
-                            onChanged: (String? newValue) {
-                              if (newValue != null) {
-                                 ref.read(geminiModelProvider.notifier).state = newValue;
-                               }
-                            },
-                          ),
-                        const SizedBox(height: 16),
-                         ElevatedButton(
-                          onPressed: () {
-                              ref.read(apiKeyProvider.notifier).state = _apiKeyController.text;
-                             if (_selectedModel != null) {
-                                ref.read(geminiModelProvider.notifier).state = _selectedModel!;
-                             }
-                           _showSnackBar('Settings saved successfully.');
-                        },
-                         child: const Text('Save Settings'),
-                        ),
-                   ],
-                 ),
-             if (_isLoading) Center(child: LoadingIndicator())
-            ]
-          ),
-         ),
+    return Scaffold(
+      key: _scaffoldKey,
+      appBar: CustomAppBar(title: 'Settings'),
+      body: IgnorePointer(
+        ignoring: _isLoading,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Stack(children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: _apiKeyController,
+                  obscureText: !_isApiKeyVisible,
+                  decoration: InputDecoration(
+                    labelText: 'Gemini API Key',
+                    border: OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _isApiKeyVisible
+                            ? Icons.visibility
+                            : Icons.visibility_off,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _isApiKeyVisible = !_isApiKeyVisible; // Toggle state
+                        });
+                      },
+                    ),
+                  ),
+                  onChanged: (value) {
+                    ref.read(apiKeyProvider.notifier).state = value;
+                    _fetchAvailableModels();
+                  },
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: _selectedModel,
+                  decoration: const InputDecoration(
+                    labelText: 'Gemini Model',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: _availableModels.map<DropdownMenuItem<String>>(
+                    (String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      );
+                    },
+                  ).toList(),
+                  onChanged: (String? newValue) {
+                    if (newValue != null) {
+                      ref.read(geminiModelProvider.notifier).state = newValue;
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    ref.read(apiKeyProvider.notifier).state =
+                        _apiKeyController.text;
+                    if (_selectedModel != null) {
+                      ref.read(geminiModelProvider.notifier).state =
+                          _selectedModel!;
+                    }
+                    _showSnackBar('Settings saved successfully.');
+                  },
+                  child: const Text('Save Settings'),
+                ),
+              ],
+            ),
+            if (_isLoading) Center(child: LoadingIndicator())
+          ]),
+        ),
       ),
     );
   }
-   void _showSnackBar(String message) {
-      if(_scaffoldKey.currentContext == null) return;
-       ScaffoldMessenger.of(_scaffoldKey.currentContext!).showSnackBar(SnackBar(
-             content: Text(message, style: const TextStyle(color: Colors.blue),)));
-    }
+
+  void _showSnackBar(String message) {
+    if (_scaffoldKey.currentContext == null) return;
+    ScaffoldMessenger.of(_scaffoldKey.currentContext!).showSnackBar(SnackBar(
+        content: Text(
+      message,
+      style: const TextStyle(color: Colors.blue),
+    )));
+  }
 }
