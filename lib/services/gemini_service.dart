@@ -41,7 +41,7 @@ class GeminiService {
       final model = GenerativeModel(model: 'gemini-2.0-flash-exp', apiKey: apiKey);
        final promptTemplate = await _loadTemplate('lib/templates/prompt.jinja2');
       final template = jj.Template(promptTemplate);
-      final prompt = template.render({'api_key': apiKey,'instruction': instruction});
+      final prompt = template.render({'instruction': instruction});
        final content = Content.multi([
          DataPart('image/jpeg', await imageFile.readAsBytes()),
          TextPart(prompt),
