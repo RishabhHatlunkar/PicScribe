@@ -116,6 +116,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     } finally {
       ref.read(loadingStateProvider.notifier).state = false;
     }
+    _imageFile = null;
+    _instructionController.text = "";
   }
 
   void _showApiKeyDialog() {
@@ -156,26 +158,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-    Widget _buildImageGrid() {
-      final images = ref.watch(imagesProvider);
-    return  SizedBox(
-      height: 150,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal, // Added horizontal scrolling
-        itemCount: images.length,
-        itemBuilder: (context, index) {
-          final image = images[index];
-            return SizedBox(
-            width: 150,
-              child:  Image.file(
-                 File(image.path),
-                    fit: BoxFit.cover,
-               ),
-             );
-        },
-      ),
-    );
-  }
+    
   void _showSnackBar(String message) {
       if (_scaffoldKey.currentContext == null) return;
        ScaffoldMessenger.of(_scaffoldKey.currentContext!).showSnackBar(SnackBar(
@@ -186,6 +169,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final images = ref.watch(imagesProvider);
     final extractedText = ref.watch(extractedTextProvider);
     final isLoading = ref.watch(loadingStateProvider);
+    FocusNode _focusNode = FocusNode();
 
       return Scaffold(
         key: _scaffoldKey,
@@ -219,52 +203,51 @@ class _HomePageState extends ConsumerState<HomePage> {
                            : const Icon(Icons.add, size: 60, color: Colors.blue),
                        ),
                       const SizedBox(height: 16),
-                      if (images.isNotEmpty)
-                       SizedBox(
-                          height: 150,
-                            child: ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                               itemCount: images.length,
-                                itemBuilder: (context, index) {
-                                  final image = images[index];
-                                    return SizedBox(
-                                    width: 150,
-                                       child:  Image.file(
-                                          File(image.path),
-                                           fit: BoxFit.cover,
-                                        ),
-                                    );
-                                },
-                             ),
-                          ),
-                     const SizedBox(height: 16),
-                      TextField(
-                        controller: _instructionController,
-                         style: const TextStyle(color: Colors.blue),
-                          decoration: const InputDecoration(
-                           labelText: 'Instruction to Extract',
-                             border: OutlineInputBorder(
-                               borderSide: BorderSide(color: Colors.blue)
-                             ),
-                            focusedBorder: OutlineInputBorder(
-                             borderSide: BorderSide(color: Colors.blue)
-                            ),
-                         ),
-                         maxLines: null,
+                      // if (images.isNotEmpty)
+                      //  SizedBox(
+                      //     height: 150,
+                      //       child: ListView.builder(
+                      //         scrollDirection: Axis.horizontal,
+                      //          itemCount: images.length,
+                      //           itemBuilder: (context, index) {
+                      //             final image = images[index];
+                      //               return SizedBox(
+                      //               width: 150,
+                      //                  child:  Image.file(
+                      //                     File(image.path),
+                      //                      fit: BoxFit.cover,
+                      //                   ),
+                      //               );
+                      //           },
+                      //        ),
+                      //     ),
+                    //  const SizedBox(height: 16),
+
+                    TextField(
+                      controller: _instructionController,
+                      focusNode: _focusNode,
+                      style: const TextStyle(color: Color.fromARGB(255, 60, 60, 60)),
+                      cursorColor: Color.fromARGB(255, 60, 60, 60),
+                      decoration: InputDecoration(
+                        labelText: 'Instruction to Extract',
+                        labelStyle: TextStyle(
+                          color: Color.fromARGB(255, 60, 60, 60),
+                        ),
+                        border: OutlineInputBorder(
+                          borderSide: BorderSide(color: Color.fromARGB(255, 0, 0, 0)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.blue),
+                        ),
                       ),
+                      maxLines: null,
+                    ),
+
                     const SizedBox(height: 16),
                    ElevatedButton(
                      onPressed: _extractTextFromImages,
                      child: const Text('Extract Text', style: TextStyle(color: Colors.blue),),
                    ),
-                     const SizedBox(height: 16),
-                      
-                   if (extractedText.isNotEmpty)
-                      ElevatedButton(
-                         onPressed: _exportToCsv,
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.blue,),
-                       child: const Text('Export to CSV', style: TextStyle(color: Colors.white),),
-                    ),
                   ],
                 ),),
                if (isLoading)
