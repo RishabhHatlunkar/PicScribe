@@ -50,7 +50,7 @@ class GeminiService {
 
       final response = await model.generateContent([content]);
 
-      final rawText = response.text ?? 'No text found.';
+      final rawText = response.text ?? 'Error';
 
       // Parse the response using the parseGeminiResponse function
       return parseGeminiResponse(rawText);

@@ -50,7 +50,9 @@ class _HomePageState extends ConsumerState<HomePage> with SingleTickerProviderSt
   }
 
   Future<void> _checkApiKeyAndShowDialog() async {
-    if (ref.read(apiKeyProvider) == null) {
+    final apiKeyAsync = ref.read(apiKeyProvider);
+    final apiKey = apiKeyAsync.valueOrNull;
+    if (apiKey == null) {
       _showApiKeyDialog();
     }
   }
@@ -74,16 +76,18 @@ class _HomePageState extends ConsumerState<HomePage> with SingleTickerProviderSt
 
   Future<void> _extractTextFromImages() async {
     final images = ref.read(imagesProvider);
-    final apiKey = ref.read(apiKeyProvider);
+    final apiKeyAsync = ref.read(apiKeyProvider);
     final geminiService = ref.read(geminiServiceProvider);
     final instruction = _instructionController.text;
+
+    final apiKey = apiKeyAsync.valueOrNull;
 
     if (images.isEmpty) {
       _showSnackBar('Please select an image first.');
       return;
     }
 
-     if (images.length > 1) {
+    if (images.length > 1) {
       _showSnackBar('Please select only one image.');
       return;
     }
@@ -100,24 +104,25 @@ class _HomePageState extends ConsumerState<HomePage> with SingleTickerProviderSt
     try {
       List<dynamic> parsedData = [];
       // since there is one image we get the first one from the list
-        var image = images[0];
-        final result =
-            await geminiService.extractTextFromImage(image, instruction);
+      var image = images[0];
+      final result =
+      await geminiService.extractTextFromImage(image, instruction);
 
-        if (result[0] == "Error") {
-          throw Exception(result[1]);
-        }
-        parsedData.add(result[1]); // Here I am taking the text directly and sending it
-        final conversionItem = ConversionItem(
-            imagePath: image.path,
-            extractedText: result[1] is String
-                ? result[1]
-                : const ListToCsvConverter().convert(result[1]),
-            timestamp: DateTime.now(),
-            instruction: instruction,
-            );
-          await ref.read(saveConversionProvider(conversionItem).future);
-       // Update the provider with the parsed data
+      if (result[0] == "Error") {
+        throw Exception(result[1]);
+      }
+      parsedData.add(result[1]); // Here I am taking the text directly and sending it
+      final conversionItem = ConversionItem(
+        imagePath: image.path,
+        extractedText: result[1] is String
+            ? result[1]
+            : const ListToCsvConverter().convert(result[1]),
+        timestamp: DateTime.now(),
+        type: getType(result[0]),
+        instruction: instruction,
+      );
+      await ref.read(saveConversionProvider(conversionItem).future);
+      // Update the provider with the parsed data
       ref.read(parsedDataProvider.notifier).state = parsedData;
       if (_scaffoldKey.currentContext != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -148,8 +153,9 @@ class _HomePageState extends ConsumerState<HomePage> with SingleTickerProviderSt
       context: _scaffoldKey.currentContext!,
       builder: (context) {
         return ApiKeyDialog(
-          onApiKeySaved: (apiKey) {
-            ref.read(apiKeyProvider.notifier).state = apiKey;
+          onApiKeySaved: (apiKey) async {
+            await ref.read(apiKeyProvider.notifier).saveApiKey(
+                apiKey);
           },
         );
       },
@@ -471,4 +477,14 @@ class _HomePageState extends ConsumerState<HomePage> with SingleTickerProviderSt
       ),
     );
   }
+}
+
+getType(result) {
+    final rawString = result as String;
+    print(rawString);
+    var _myType = "md";
+    if (rawString.contains('Table')) {
+      _myType = "table"; // CSV has priority in this case
+    }
+    return _myType;
 }

@@ -4,13 +4,15 @@ class ConversionItem {
   final String extractedText;
   final DateTime timestamp;
    final String instruction;
+final String type;
 
   ConversionItem({
     this.id,
     required this.imagePath,
     required this.extractedText,
     required this.timestamp,
-    required this.instruction
+    required this.instruction,
+    required this.type
   });
 
   Map<String, dynamic> toMap() {
@@ -20,6 +22,7 @@ class ConversionItem {
       'extractedText': extractedText,
       'timestamp': timestamp.toIso8601String(),
       'instruction' : instruction,
+      'type' : type,
     };
   }
 
@@ -30,6 +33,7 @@ class ConversionItem {
       extractedText: map['extractedText'],
       timestamp: DateTime.parse(map['timestamp']),
       instruction: map['instruction'] ?? "", // Default value of empty string in case null is present
+      type: map['type'] ?? true
     );
   }
 }

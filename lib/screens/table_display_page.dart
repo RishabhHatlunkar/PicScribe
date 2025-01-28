@@ -29,6 +29,7 @@ class _TableDisplayPageState extends ConsumerState<TableDisplayPage> {
   List<Map<dynamic, dynamic>> _tableData = [];
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _isMarkdown = false;
+  bool _responsestatus = true;
 
   @override
   void initState() {
@@ -39,8 +40,12 @@ class _TableDisplayPageState extends ConsumerState<TableDisplayPage> {
   void _parseData() {
     final rawString = widget.parsedData[0] as String;
 
-    // Check if the text is Markdown
-    if (_isMarkdownText(rawString)) {
+    if (rawString.startsWith('Type: Table') || rawString.contains('```csv')) {
+      // It's likely a CSV inside a Markdown block
+      _parseCsvTable(rawString);
+      _isMarkdown = false; // CSV has priority in this case
+    } else if (_isMarkdownText(rawString)) {
+      // Check for Markdown structure
       _isMarkdown = true;
     } else {
       _parseCsvTable(rawString);
@@ -48,65 +53,78 @@ class _TableDisplayPageState extends ConsumerState<TableDisplayPage> {
   }
 
   bool _isMarkdownText(String text) {
-    // Detect Markdown by checking common Markdown syntax
-    const markdownKeywords = [
-      '#',
-      '-',
-      '*',
-      '`',
-      '[',
-      ']',
-      '(',
-      ')',
-      '```',
-      '**',
-      '_'
-    ];
-    return markdownKeywords.any((keyword) => text.contains(keyword));
+    // Detect Markdown by checking its structure rather than just keywords
+    final markdownRegex = RegExp(
+      r'(^#{1,6}\s|^\*|^\-|^\d+\.\s|```|`[^`]*`|\[[^\]]+\]\([^)]+\))',
+      multiLine: true,
+    );
+    return markdownRegex.hasMatch(text);
   }
 
   void _parseCsvTable(String rawString) {
-    List<String> lines = rawString.split('\n');
-    List<dynamic> headers = [];
-    List<Map<dynamic, dynamic>> table = [];
-    bool foundHeader = false;
+    final csvBlockRegex = RegExp(r'```csv\s*([\s\S]*?)\s*```');
+    final match = csvBlockRegex.firstMatch(rawString);
 
-    for (String line in lines) {
-      line = line.trim();
+    if (match != null) {
+      final csvContent = match.group(1)!;
+      List<String> lines = csvContent.split('\n');
+      List<dynamic> headers = [];
+      List<Map<dynamic, dynamic>> table = [];
+      bool foundHeader = false;
 
-      if (line.isEmpty ||
-          line.startsWith('---') ||
-          line.startsWith('Type: Table') ||
-          line.startsWith('```csv') ||
-          line.startsWith('```')) {
-        continue;
-      }
+      for (String line in lines) {
+        line = line.trim();
 
-      if (!foundHeader && line.contains(',')) {
-        headers = _parseCsvRow(line);
-        foundHeader = true;
-        continue;
-      }
+        if (line.isEmpty) continue;
 
-      if (foundHeader && line.contains(',')) {
+        if (!foundHeader) {
+          headers = _parseCsvRow(line);
+          foundHeader = true;
+          continue;
+        }
+
         List<dynamic> row = _parseCsvRow(line);
         Map<dynamic, dynamic> rowData = {};
         for (int i = 0; i < headers.length; i++) {
           rowData[headers[i]] = i < row.length ? row[i] : "";
         }
-        table.add(rowData);
+        if(rowData.length == headers.length){
+          _responsestatus = true;
+        }
+      }
+      _headers = headers;
+      _tableData = table;
+    } else {
+      // Handle plain CSV without Markdown block
+      List<String> lines = rawString.split('\n');
+      _headers = [];
+      _tableData = [];
+
+      for (String line in lines) {
+        line = line.trim();
+
+        if (line.isEmpty || line.startsWith('---')) continue;
+
+        if (_headers.isEmpty && line.contains(',')) {
+          _headers = _parseCsvRow(line);
+          continue;
+        }
+
+        if (_headers.isNotEmpty && line.contains(',')) {
+          List<dynamic> row = _parseCsvRow(line);
+          Map<dynamic, dynamic> rowData = {};
+          for (int i = 0; i < _headers.length; i++) {
+            rowData[_headers[i]] = i < row.length ? row[i] : "";
+          }
+          _tableData.add(rowData);
+        }
       }
     }
-    _headers = headers;
-    _tableData = table;
   }
 
   List<dynamic> _parseCsvRow(String row) {
-    RegExp regex = RegExp(r'(?:\"([^\"]*)\")|([^,]+)|(?<=,)(?=,)|(?<=,)$');
-    Iterable<RegExpMatch> matches = regex.allMatches(row);
-    return matches
-        .map((match) => match.group(1) ?? match.group(2) ?? "")
-        .toList();
+    final regex = RegExp(r'(?:\"([^\"]*)\")|([^,]+)|(?<=,)(?=,)|(?<=,)$');
+    return regex.allMatches(row).map((match) => match.group(1) ?? match.group(2) ?? "").toList();
   }
 
   String _convertTableToCsv(List<Map<dynamic, dynamic>> table) {
@@ -212,72 +230,64 @@ class _TableDisplayPageState extends ConsumerState<TableDisplayPage> {
     return Scaffold(
       key: _scaffoldKey,
       appBar: CustomAppBar(title: 'Extracted Data'),
-      body: Padding(
+      body: _responsestatus? Padding(
         padding: const EdgeInsets.all(16.0),
-        child: _isMarkdown
+        child: _tableData.isNotEmpty
             ? Column(
-                children: [
-                  Expanded(
-                    child: _isMarkdown
-                        ? Markdown(
-                            data: widget.parsedData[0],
-                            styleSheet: MarkdownStyleSheet(
-                              p: const TextStyle(fontSize: 16, height: 1.5),
-                              blockquote: const TextStyle(color: Colors.blue),
-                              code: const TextStyle(
-                                  color: Colors.red,
-                                  backgroundColor: Colors.black12),
-                            ),
-                          )
-                        : const Center(
-                            child: Text(
-                              "No Data",
-                              style: TextStyle(color: Colors.blue),
-                            ),
-                          ),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: _tableData.isNotEmpty
+                  ? SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SingleChildScrollView(
+                  child: DataTable(
+                    columns: _buildColumns(_headers),
+                    rows: _buildRows(_tableData),
                   ),
-                  if (_isMarkdown)
-                    ElevatedButton(
-                      onPressed: () => _exportToFile(context),
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue),
-                      child: const Text('Export to File',
-                          style: TextStyle(color: Colors.white)),
-                    ),
-                ],
+                ),
               )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: _tableData.isNotEmpty
-                        ? SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: SingleChildScrollView(
-                              child: DataTable(
-                                columns: _buildColumns(_headers),
-                                rows: _buildRows(_tableData),
-                              ),
-                            ),
-                          )
-                        : const Center(
-                            child: Text(
-                              "No Data",
-                              style: TextStyle(color: Colors.blue),
-                            ),
-                          ),
-                  ),
-                  if (_tableData.isNotEmpty)
-                    ElevatedButton(
-                      onPressed: () => _exportToCsv(context),
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue),
-                      child: const Text('Export to CSV',
-                          style: TextStyle(color: Colors.white)),
-                    ),
-                ],
+                  : const Center(
+                child: Text(
+                  "No Data",
+                  style: TextStyle(color: Colors.blue),
+                ),
               ),
-      ),
+            ),
+            if (_tableData.isNotEmpty)
+              ElevatedButton(
+                onPressed: () => _exportToCsv(context),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue),
+                child: const Text('Export to CSV',
+                    style: TextStyle(color: Colors.white)),
+              ),
+          ],
+        )
+            : Column(
+          children: [
+            Expanded(
+              child: Markdown(
+                data: widget.parsedData[0],
+                styleSheet: MarkdownStyleSheet(
+                  p: const TextStyle(fontSize: 16, height: 1.5),
+                  blockquote: const TextStyle(color: Colors.blue),
+                  code: const TextStyle(
+                      color: Colors.red,
+                      backgroundColor: Colors.black12),
+                ),
+              )
+            ),
+              ElevatedButton(
+                onPressed: () => _exportToFile(context),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue),
+                child: const Text('Export to File',
+                    style: TextStyle(color: Colors.white)),
+              ),
+          ],
+        ),
+      ): const Center(child: Text("Response Error Please Try Again...", style: TextStyle(color: Colors.red),),)
     );
   }
 }

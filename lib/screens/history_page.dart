@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -5,7 +7,6 @@ import 'package:intl/intl.dart';
 import 'package:pixelsheet/models/conversion_item.dart';
 import 'package:pixelsheet/screens/table_display_page.dart';
 import 'package:pixelsheet/widgets/custom_app_bar.dart';
-import 'package:pixelsheet/services/csv_service.dart';
 import 'package:pixelsheet/providers/providers.dart';
 import 'dart:io';
 
@@ -20,6 +21,63 @@ class _HistoryPageState extends ConsumerState<HistoryPage>
   late Future<List<ConversionItem>> _historyItems;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   late AnimationController _animationController;
+
+
+  Future<void> _exportToCsv(BuildContext context, ConversionItem item) async {
+    try {
+      final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final String fileName = 'table_data_$timestamp';
+      final Uint8List bytes = Uint8List.fromList(item.extractedText.codeUnits);
+
+      final String? savedPath = await FileSaver.instance.saveAs(
+        name: fileName,
+        bytes: bytes,
+        ext: 'csv',
+        mimeType: MimeType.csv,
+      );
+
+      if (savedPath != null) {
+        _showSnackBar('CSV file saved successfully to: $savedPath');
+      } else {
+        _showSnackBar('Save operation canceled.');
+      }
+    } catch (e) {
+      _showSnackBar('Error saving CSV: $e');
+    }
+  }
+
+  Future<void> _exportToFile(BuildContext context, ConversionItem item) async {
+    if (item.extractedText.isEmpty || item.extractedText == "Error") {
+      _showSnackBar('No text to export.');
+      return;
+    }
+
+    try {
+      final String rawText = item.extractedText;
+      final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final String fileName = 'extracted_text_$timestamp';
+
+      // Convert text to UTF-8 bytes
+      final Uint8List bytes = Uint8List.fromList(rawText.codeUnits);
+
+      // Save the file using FileSaver's saveAs() to trigger the system picker
+      final String? savedPath = await FileSaver.instance.saveAs(
+        name: fileName,
+        bytes: bytes,
+        ext: 'txt',
+        mimeType: MimeType.text,
+      );
+
+      if (savedPath != null) {
+        _showSnackBar('File saved successfully to: $savedPath');
+      } else {
+        _showSnackBar('Save operation canceled.');
+      }
+    } catch (e) {
+      _showSnackBar('Error saving file: $e');
+    }
+  }
+
 
   @override
   void initState() {
@@ -77,26 +135,6 @@ class _HistoryPageState extends ConsumerState<HistoryPage>
     );
   }
 
-  Future<void> _exportConversionToCsv(ConversionItem item) async {
-    List<List<dynamic>> csvData = [
-      ['Image Path', 'Extracted Text', 'Timestamp', 'Instruction'],
-      [
-        item.imagePath,
-        item.extractedText,
-        DateFormat('yyyy-MM-dd HH:mm:ss').format(item.timestamp),
-        item.instruction,
-      ]
-    ];
-
-    try {
-      String message =
-          await CsvService.exportToCsv(csvData, 'conversion_${item.id}');
-      _showSnackBar(message);
-    } catch (e) {
-      _showSnackBar('Error saving CSV: $e');
-    }
-  }
-
   Future<void> _deleteConversion(ConversionItem item) async {
     final databaseService = ref.read(databaseServiceProvider);
     try {
@@ -126,7 +164,7 @@ class _HistoryPageState extends ConsumerState<HistoryPage>
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      appBar: CustomAppBar(title: 'Conversion History'),
+      appBar: const CustomAppBar(title: 'Conversion History'),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -308,8 +346,13 @@ class _HistoryPageState extends ConsumerState<HistoryPage>
                                           IconButton(
                                             icon: const Icon(Icons.save_alt),
                                             color: Colors.blue[700],
-                                            onPressed: () =>
-                                                _exportConversionToCsv(item),
+                                            onPressed: () {
+                                              if(item.type == "md"){
+                                                  _exportToFile(context, item);
+                                              } else {
+                                                _exportToCsv(context, item);
+                                              }
+                                            }
                                           ),
                                           IconButton(
                                             icon: const Icon(Icons.delete),

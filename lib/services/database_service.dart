@@ -26,7 +26,8 @@ class DatabaseService {
         imagePath TEXT NOT NULL,
         extractedText TEXT NOT NULL,
         timestamp TEXT NOT NULL,
-        instruction TEXT NOT NULL
+        instruction TEXT NOT NULL,
+        type TEXT 
       )
     ''');
     await db.execute('''
@@ -34,6 +35,7 @@ class DatabaseService {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         imagePath TEXT NOT NULL,
         description TEXT NOT NULL
+        
       )
     ''');
   }
