@@ -6,8 +6,6 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:pixelsheet/widgets/loading_indicator.dart';
 
-import 'about_us_page.dart';
-
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 
@@ -145,98 +143,175 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       });
     }
   }
-
-  @override
+@override
   Widget build(BuildContext context) {
-    print('SettingsPage: build method called.');
+   print('SettingsPage: build method called.');
     return Scaffold(
       key: _scaffoldKey,
-      appBar: CustomAppBar(title: 'Settings'),
+      appBar: CustomAppBar(
+        title: 'Settings',
+      ),
       body: IgnorePointer(
         ignoring: _isLoading,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Stack(children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Consumer(
-                    builder: (context, ref, child){
-                      final apiKeyAsync = ref.watch(apiKeyProvider);
-                      return apiKeyAsync.when(
-                        data: (apiKey){
-                          return TextField(
-                            controller: _apiKeyController,
-                            obscureText: !_isApiKeyVisible,
-                            decoration: InputDecoration(
-                              labelText: 'Gemini API Key',
-                              border: const OutlineInputBorder(),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _isApiKeyVisible
-                                      ? Icons.visibility
-                                      : Icons.visibility_off,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _isApiKeyVisible = !_isApiKeyVisible;
-                                  });
-                                },
-                              ),
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Consumer(builder: (context, ref, child) {
+                    final apiKeyAsync = ref.watch(apiKeyProvider);
+                    return apiKeyAsync.when(
+                      data: (apiKey) {
+                        return TextField(
+                          controller: _apiKeyController,
+                          obscureText: !_isApiKeyVisible,
+                          cursorColor: Colors.blue,
+                          style: const TextStyle(
+                              color: Color.fromARGB(255, 60, 60, 60)),
+                          decoration: InputDecoration(
+                            labelText: 'Gemini API Key',
+                            labelStyle: const TextStyle(
+                              color: Color.fromARGB(255, 60, 60, 60),
                             ),
-                            onChanged: (value) async {
-                              await ref.read(apiKeyProvider.notifier).saveApiKey(value);
-                              _fetchAvailableModels();
-                            },
-                          );
-                        },
-                        error: (error, stacktrace) => Text('Error loading API Key: ${error.toString()}'),
-                        loading:()=> const Text('Loading API Key...'),
-                      );
-                    }
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: _selectedModel,
-                  decoration: const InputDecoration(
-                    labelText: 'Gemini Model',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: _availableModels.map<DropdownMenuItem<String>>(
-                        (String value) {
+                            border: const OutlineInputBorder(
+                                borderSide: BorderSide(
+                                    color: Color.fromARGB(255, 0, 0, 0))),
+                            focusedBorder: const OutlineInputBorder(
+                              borderSide: BorderSide(color: Colors.blue),
+                            ),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _isApiKeyVisible
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                                color: Colors.blue,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _isApiKeyVisible = !_isApiKeyVisible;
+                                });
+                              },
+                            ),
+                          ),
+                          onChanged: (value) async {
+                            await ref
+                                .read(apiKeyProvider.notifier)
+                                .saveApiKey(value);
+                            _fetchAvailableModels();
+                          },
+                        );
+                      },
+                      error: (error, stacktrace) => Text(
+                        'Error loading API Key: ${error.toString()}',
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                      loading: () => const Text(
+                        'Loading API Key...',
+                        style: TextStyle(color: Colors.blue),
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    value: _selectedModel,
+                    decoration: const InputDecoration(
+                      labelText: 'Gemini Model',
+                      labelStyle: TextStyle(
+                        color: Color.fromARGB(255, 60, 60, 60),
+                      ),
+                      border: OutlineInputBorder(
+                          borderSide: BorderSide(
+                              color: Color.fromARGB(255, 0, 0, 0))),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.blue),
+                      ),
+                    ),
+                    items: _availableModels
+                        .map<DropdownMenuItem<String>>((String value) {
                       return DropdownMenuItem<String>(
                         value: value,
-                        child: Text(value),
+                        child: Text(value,
+                            style: const TextStyle(color: Colors.blue)),
                       );
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      if (newValue != null) {
+                        ref.read(geminiModelProvider.notifier).state =
+                            newValue;
+                        setState(() {
+                          _selectedModel = newValue;
+                        });
+                      }
                     },
-                  ).toList(),
-                  onChanged: (String? newValue) {
-                    if (newValue != null) {
-                      ref.read(geminiModelProvider.notifier).state = newValue;
-                    }
-                  },
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () async {
-                    print('SettingsPage: Save settings button tapped.');
-                    await ref.read(apiKeyProvider.notifier).saveApiKey(
-                        _apiKeyController.text);
-                    if (_selectedModel != null) {
-                      ref.read(geminiModelProvider.notifier).state =
-                      _selectedModel!;
-                    }
-                    _showSnackBar('Settings saved successfully.');
-                  },
-                  child: const Text('Save Settings'),
-                ),
-              ],
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        print('SettingsPage: Save settings button tapped.');
+                        await ref
+                            .read(apiKeyProvider.notifier)
+                            .saveApiKey(_apiKeyController.text);
+                        if (_selectedModel != null) {
+                          ref.read(geminiModelProvider.notifier).state =
+                              _selectedModel!;
+                        }
+                        _showSnackBar('Settings saved successfully.');
+                      },
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8))),
+                      child: const Text('Save Settings'),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            Positioned(child: TextButton(onPressed: (){
-              Navigator.push(context, MaterialPageRoute(builder: (context) =>AboutUsPage()));
-            }, child: Text("About Us..."))),
+            Positioned(
+              bottom: 110,
+              left: 20,
+              right: 20,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                 padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Want to know who am I?',
+                     style: TextStyle(
+                       fontWeight: FontWeight.w500,
+                       color: Colors.black87
+                     ),),
+                     ElevatedButton(
+                       onPressed: () {
+                         Navigator.push(context,
+                             MaterialPageRoute(builder: (context) => const AboutUsPage()));
+                       },
+                         style: ElevatedButton.styleFrom(
+                           backgroundColor: Colors.white,
+                             foregroundColor: Colors.blue,
+                           elevation: 2,
+                           shape: RoundedRectangleBorder(
+                               borderRadius: BorderRadius.circular(8)
+                           )
+                         ),
+                       child: const Text('About Us',),
+
+                     )
+                  ],
+                ),
+              )
+            ),
             if (_isLoading) Center(child: LoadingIndicator())
-          ]),
+          ],
         ),
       ),
     );
@@ -249,5 +324,91 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           message,
           style: const TextStyle(color: Colors.blue),
         )));
+  }
+}
+
+class AboutUsPage extends ConsumerStatefulWidget {
+  const AboutUsPage({super.key});
+  @override
+  ConsumerState<AboutUsPage> createState() => _AboutUsPageState();
+}
+
+class _AboutUsPageState extends ConsumerState<AboutUsPage> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: CustomAppBar(
+        title: 'About Picscrabe',
+        showBackButton: true,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Picscrabe',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold, color: Colors.blue),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Picscrabe is a mobile application developed to streamline the process of extracting text from images. We understand the challenges of manually typing information from photos, so we created a powerful tool that does it for you quickly and accurately.',
+                style: Theme.of(context).textTheme.bodyLarge,
+                textAlign: TextAlign.justify,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Key Features:',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold, color: Colors.black87),
+              ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.only(left: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '* Easy image selection from gallery or camera',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    Text(
+                      '* Fast and accurate text extraction',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    Text(
+                      '* Options to save extracted text as CSV',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    Text(
+                      '* Intuitive and user-friendly design',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Our goal is to provide a seamless experience, making information extraction effortless and convenient for everyone.',
+                style: Theme.of(context).textTheme.bodyLarge,
+                textAlign: TextAlign.justify,
+              ),
+              const SizedBox(height: 32),
+              Center(
+                child: Text(
+                  'Developed by Rishabh Hatlnkar and Atharva Jagtap.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontStyle: FontStyle.italic,
+                        color: Colors.grey[600],
+                      ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
