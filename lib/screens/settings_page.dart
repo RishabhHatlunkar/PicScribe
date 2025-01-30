@@ -30,118 +30,123 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Future<void> _initializeSettings() async {
     print('SettingsPage: _initializeSettings called.');
-    final apiKeyAsync = ref.read(apiKeyProvider);
-    final apiKey = apiKeyAsync.valueOrNull;
-    print('SettingsPage: _initializeSettings, apiKey from provider: $apiKey');
-    _apiKeyController.text = apiKey ?? '';
-    _selectedModel = ref.read(geminiModelProvider);
-    if(apiKey != null){
-      print('SettingsPage: _initializeSettings, API key is not null, fetching models.');
-      await _fetchAvailableModels();
-    }else{
-      print('SettingsPage: _initializeSettings, API key is null, skipping fetch models.');
-    }
+      try {
+      final apiKeyAsync = ref.read(apiKeyProvider);
+      final apiKey = apiKeyAsync.valueOrNull;
+      print('SettingsPage: _initializeSettings, apiKey from provider: $apiKey');
+      _apiKeyController.text = apiKey ?? '';
+      _selectedModel = ref.read(geminiModelProvider);
+      if(apiKey != null){
+        print('SettingsPage: _initializeSettings, API key is not null, fetching models.');
+        await _fetchAvailableModels();
+      }else{
+        print('SettingsPage: _initializeSettings, API key is null, skipping fetch models.');
+      }
+      }
+      catch(e, st){
+        print('SettingsPage: Error during initialization: $e\n$st');
+        _showSnackBar('An error occurred while initializing the settings.');
+      }
   }
 
   Future<void> _fetchAvailableModels() async {
-    print('SettingsPage: _fetchAvailableModels called.');
-    setState(() {
-      _isLoading = true;
-      _availableModels = [];
-      print('SettingsPage: _fetchAvailableModels, setting loading state to true.');
-    });
-    final apiKeyAsync = ref.read(apiKeyProvider);
-    final apiKey = apiKeyAsync.valueOrNull;
-    print('SettingsPage: _fetchAvailableModels, apiKey from provider: $apiKey');
-    if (apiKey == null || apiKey.isEmpty) {
-      print('SettingsPage: _fetchAvailableModels, API Key is null or empty.');
-      if (!mounted) return; // Check if the widget is still mounted
+     print('SettingsPage: _fetchAvailableModels called.');
+     if(!mounted) return;
       setState(() {
-        _availableModels = ['API Key not set'];
-        _isLoading = false;
-        _selectedModel = null;
-        ref.read(geminiModelProvider.notifier).state = null;
-        print('SettingsPage: _fetchAvailableModels, setting models to default because apiKey is not set.');
+        _isLoading = true;
+        _availableModels = [];
+        print('SettingsPage: _fetchAvailableModels, setting loading state to true.');
       });
-      return;
+      final apiKeyAsync = ref.read(apiKeyProvider);
+      final apiKey = apiKeyAsync.valueOrNull;
+      print('SettingsPage: _fetchAvailableModels, apiKey from provider: $apiKey');
+    if (apiKey == null || apiKey.isEmpty) {
+          print('SettingsPage: _fetchAvailableModels, API Key is null or empty.');
+          if (!mounted) return; // Check if the widget is still mounted
+          setState(() {
+          _availableModels = ['API Key not set'];
+          _isLoading = false;
+          _selectedModel = null;
+          ref.read(geminiModelProvider.notifier).state = null;
+          print('SettingsPage: _fetchAvailableModels, setting models to default because apiKey is not set.');
+          });
+          return;
     }
 
+      const url = 'https://generativelanguage.googleapis.com/v1beta/models?key=';
+      try {
+        final response = await http.get(Uri.parse('$url$apiKey'));
+        if (response.statusCode == 200) {
+           print('SettingsPage: _fetchAvailableModels, API call successful, parsing models.');
+          final data = json.decode(response.body);
+          final models = (data['models'] as List)
+              .map((model) => model['name'].toString())
+              .where((name) => name.startsWith('models/gemini'))
+              .toList();
 
-    const url = 'https://generativelanguage.googleapis.com/v1beta/models?key=';
-    try {
-      final response = await http.get(Uri.parse('$url$apiKey'));
-      if (response.statusCode == 200) {
-        print('SettingsPage: _fetchAvailableModels, API call successful, parsing models.');
-        final data = json.decode(response.body);
-        final models = (data['models'] as List)
-            .map((model) => model['name'].toString())
-            .where((name) => name.startsWith('models/gemini'))
-            .toList();
+          models.sort((a, b) {
+            final aVersion = a.split('/').last;
+            final bVersion = b.split('/').last;
 
-        models.sort((a, b) {
-          final aVersion = a.split('/').last;
-          final bVersion = b.split('/').last;
+            final aParts = aVersion.split('-');
+            final bParts = bVersion.split('-');
 
-          final aParts = aVersion.split('-');
-          final bParts = bVersion.split('-');
-
-          for (int i = 0; i < aParts.length && i < bParts.length; i++) {
-            if (int.tryParse(aParts[i]) != null &&
-                int.tryParse(bParts[i]) != null) {
-              final int aNum = int.parse(aParts[i]);
-              final int bNum = int.parse(bParts[i]);
-              if (aNum != bNum) {
-                return bNum.compareTo(aNum);
+            for (int i = 0; i < aParts.length && i < bParts.length; i++) {
+              if (int.tryParse(aParts[i]) != null &&
+                  int.tryParse(bParts[i]) != null) {
+                final int aNum = int.parse(aParts[i]);
+                final int bNum = int.parse(bParts[i]);
+                if (aNum != bNum) {
+                  return bNum.compareTo(aNum);
+                }
+              } else {
+                 final int strCompare = bParts[i].compareTo(aParts[i]);
+                 if (strCompare != 0) return strCompare;
               }
-            } else {
-              final int strCompare = bParts[i].compareTo(aParts[i]);
-              if (strCompare != 0) return strCompare;
             }
+             return bVersion.length.compareTo(aVersion.length);
+          });
+
+          String? defaultModel;
+          if (models.contains('models/gemini-2.0-flash-exp')) {
+            defaultModel = 'models/gemini-2.0-flash-exp';
+          } else if (models.isNotEmpty) {
+             defaultModel = models.first;
           }
-          return bVersion.length.compareTo(aVersion.length);
-        });
 
-        String? defaultModel;
-        if (models.contains('models/gemini-2.0-flash-exp')) {
-          defaultModel = 'models/gemini-2.0-flash-exp';
-        } else if (models.isNotEmpty) {
-          defaultModel = models.first;
-        }
-
-
-        if (!mounted) return; // Check if the widget is still mounted
-        setState(() {
+           if (!mounted) return; // Check if the widget is still mounted
+          setState(() {
           print('SettingsPage: _fetchAvailableModels, models loaded and updating state.');
           _availableModels = models;
           _isLoading = false;
           if (_selectedModel == null ||
-              !_availableModels.contains(_selectedModel)) {
-            _selectedModel = defaultModel;
-            ref.read(geminiModelProvider.notifier).state = _selectedModel;
+                !_availableModels.contains(_selectedModel)) {
+              _selectedModel = defaultModel;
+              ref.read(geminiModelProvider.notifier).state = _selectedModel;
           }
-        });
-      } else {
-        print('SettingsPage: _fetchAvailableModels, API call failed.');
+           });
+        } else {
+          print('SettingsPage: _fetchAvailableModels, API call failed.');
+           if (!mounted) return; // Check if the widget is still mounted
+          setState(() {
+            _availableModels = ['Failed to load models'];
+            _isLoading = false;
+            _selectedModel = null;
+            ref.read(geminiModelProvider.notifier).state = null;
+            print('SettingsPage: _fetchAvailableModels, setting default models due to api failure.');
+          });
+        }
+      } catch (e, st) {
+        print('SettingsPage: _fetchAvailableModels, Exception thrown: $e\n$st.');
         if (!mounted) return; // Check if the widget is still mounted
         setState(() {
-          _availableModels = ['Failed to load models'];
+          _availableModels = ['Error: ${e.toString()}'];
           _isLoading = false;
           _selectedModel = null;
           ref.read(geminiModelProvider.notifier).state = null;
-          print('SettingsPage: _fetchAvailableModels, setting default models due to api failure.');
+          print('SettingsPage: _fetchAvailableModels, setting default models due to exception.');
         });
       }
-    } catch (e) {
-      print('SettingsPage: _fetchAvailableModels, Exception thrown: $e.');
-      if (!mounted) return; // Check if the widget is still mounted
-      setState(() {
-        _availableModels = ['Error: ${e.toString()}'];
-        _isLoading = false;
-        _selectedModel = null;
-        ref.read(geminiModelProvider.notifier).state = null;
-        print('SettingsPage: _fetchAvailableModels, setting default models due to exception.');
-      });
-    }
   }
 @override
   Widget build(BuildContext context) {
@@ -196,10 +201,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             ),
                           ),
                           onChanged: (value) async {
-                            await ref
+                            try{
+                               await ref
                                 .read(apiKeyProvider.notifier)
                                 .saveApiKey(value);
-                            _fetchAvailableModels();
+                              _fetchAvailableModels();
+                            } catch(e, st) {
+                             print('SettingsPage: Error saving the API key :$e\n$st');
+                              _showSnackBar('Error saving API Key: $e');
+                            }
                           },
                         );
                       },
@@ -252,14 +262,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     child: ElevatedButton(
                       onPressed: () async {
                         print('SettingsPage: Save settings button tapped.');
-                        await ref
-                            .read(apiKeyProvider.notifier)
-                            .saveApiKey(_apiKeyController.text);
-                        if (_selectedModel != null) {
-                          ref.read(geminiModelProvider.notifier).state =
-                              _selectedModel!;
-                        }
-                        _showSnackBar('Settings saved successfully.');
+                         try{
+                            await ref
+                              .read(apiKeyProvider.notifier)
+                              .saveApiKey(_apiKeyController.text);
+                          if (_selectedModel != null) {
+                             ref.read(geminiModelProvider.notifier).state =
+                                  _selectedModel!;
+                          }
+                           _showSnackBar('Settings saved successfully.');
+                           }catch (e, st) {
+                                 print('SettingsPage: Error during settings save :$e\n$st');
+                              _showSnackBar('Error saving Settings: $e');
+                            }
                       },
                       style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue,
@@ -318,7 +333,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   void _showSnackBar(String message) {
-    if (_scaffoldKey.currentContext == null) return;
+    if (_scaffoldKey.currentContext == null || !mounted) return;
     ScaffoldMessenger.of(_scaffoldKey.currentContext!).showSnackBar(SnackBar(
         content: Text(
           message,

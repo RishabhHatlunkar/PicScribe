@@ -38,18 +38,25 @@ class _TableDisplayPageState extends ConsumerState<TableDisplayPage> {
   }
 
   void _parseData() {
-    final rawString = widget.parsedData[0] as String;
-
-    if (rawString.startsWith('Type: Table') || rawString.contains('```csv')) {
-      // It's likely a CSV inside a Markdown block
-      _parseCsvTable(rawString);
-      _isMarkdown = false; // CSV has priority in this case
-    } else if (_isMarkdownText(rawString)) {
-      // Check for Markdown structure
-      _isMarkdown = true;
-    } else {
-      _parseCsvTable(rawString);
-    }
+     try{
+       final rawString = widget.parsedData[0] as String;
+      if (rawString.startsWith('Type: Table') || rawString.contains('```csv')) {
+        // It's likely a CSV inside a Markdown block
+        _parseCsvTable(rawString);
+        _isMarkdown = false; // CSV has priority in this case
+      } else if (_isMarkdownText(rawString)) {
+        // Check for Markdown structure
+        _isMarkdown = true;
+      } else {
+        _parseCsvTable(rawString);
+      }
+     } catch(e, st){
+        print('Error Parsing Data: $e\n$st');
+        _showSnackBar('Error parsing data for display, Please try again.');
+        setState(() {
+           _responsestatus = false;
+        });
+     }
   }
 
   bool _isMarkdownText(String text) {
@@ -62,69 +69,83 @@ class _TableDisplayPageState extends ConsumerState<TableDisplayPage> {
   }
 
   void _parseCsvTable(String rawString) {
-    final csvBlockRegex = RegExp(r'```csv\s*([\s\S]*?)\s*```');
-    final match = csvBlockRegex.firstMatch(rawString);
+     try{
+       final csvBlockRegex = RegExp(r'```csv\s*([\s\S]*?)\s*```');
+       final match = csvBlockRegex.firstMatch(rawString);
 
-    if (match != null) {
-      final csvContent = match.group(1)!;
-      List<String> lines = csvContent.split('\n');
-      List<dynamic> headers = [];
-      List<Map<dynamic, dynamic>> table = [];
-      bool foundHeader = false;
+       if (match != null) {
+         final csvContent = match.group(1)!;
+         List<String> lines = csvContent.split('\n');
+         List<dynamic> headers = [];
+         List<Map<dynamic, dynamic>> table = [];
+         bool foundHeader = false;
 
-      for (String line in lines) {
-        line = line.trim();
+         for (String line in lines) {
+           line = line.trim();
 
-        if (line.isEmpty) continue;
+           if (line.isEmpty) continue;
 
-        if (!foundHeader) {
-          headers = _parseCsvRow(line);
-          foundHeader = true;
-          continue;
-        }
+           if (!foundHeader) {
+             headers = _parseCsvRow(line);
+             foundHeader = true;
+             continue;
+           }
 
-        List<dynamic> row = _parseCsvRow(line);
-        Map<dynamic, dynamic> rowData = {};
-        for (int i = 0; i < headers.length; i++) {
-          rowData[headers[i]] = i < row.length ? row[i] : "";
-        }
-        if(rowData.length == headers.length){
-          _responsestatus = true;
-        }
-      }
-      _headers = headers;
-      _tableData = table;
-    } else {
-      // Handle plain CSV without Markdown block
-      List<String> lines = rawString.split('\n');
-      _headers = [];
-      _tableData = [];
-
-      for (String line in lines) {
-        line = line.trim();
-
-        if (line.isEmpty || line.startsWith('---')) continue;
-
-        if (_headers.isEmpty && line.contains(',')) {
-          _headers = _parseCsvRow(line);
-          continue;
-        }
-
-        if (_headers.isNotEmpty && line.contains(',')) {
-          List<dynamic> row = _parseCsvRow(line);
-          Map<dynamic, dynamic> rowData = {};
-          for (int i = 0; i < _headers.length; i++) {
-            rowData[_headers[i]] = i < row.length ? row[i] : "";
+           List<dynamic> row = _parseCsvRow(line);
+           Map<dynamic, dynamic> rowData = {};
+           for (int i = 0; i < headers.length; i++) {
+             rowData[headers[i]] = i < row.length ? row[i] : "";
+           }
+           if(rowData.length == headers.length){
+            _responsestatus = true;
           }
-          _tableData.add(rowData);
-        }
+         }
+          _headers = headers;
+          _tableData = table;
+      } else {
+          // Handle plain CSV without Markdown block
+          List<String> lines = rawString.split('\n');
+          _headers = [];
+          _tableData = [];
+
+          for (String line in lines) {
+            line = line.trim();
+
+            if (line.isEmpty || line.startsWith('---')) continue;
+
+            if (_headers.isEmpty && line.contains(',')) {
+              _headers = _parseCsvRow(line);
+              continue;
+            }
+
+           if (_headers.isNotEmpty && line.contains(',')) {
+             List<dynamic> row = _parseCsvRow(line);
+              Map<dynamic, dynamic> rowData = {};
+              for (int i = 0; i < _headers.length; i++) {
+                  rowData[_headers[i]] = i < row.length ? row[i] : "";
+                }
+             _tableData.add(rowData);
+           }
+         }
       }
-    }
+      } catch(e, st) {
+         print('Error Parsing CSV Table: $e\n$st');
+        _showSnackBar('Error parsing csv table.');
+        setState(() {
+          _responsestatus = false;
+         });
+       }
   }
 
   List<dynamic> _parseCsvRow(String row) {
-    final regex = RegExp(r'(?:\"([^\"]*)\")|([^,]+)|(?<=,)(?=,)|(?<=,)$');
-    return regex.allMatches(row).map((match) => match.group(1) ?? match.group(2) ?? "").toList();
+    try{
+        final regex = RegExp(r'(?:\"([^\"]*)\")|([^,]+)|(?<=,)(?=,)|(?<=,)$');
+        return regex.allMatches(row).map((match) => match.group(1) ?? match.group(2) ?? "").toList();
+    } catch (e, st) {
+        print('Error Parsing CSV Row: $e\n$st');
+        _showSnackBar('Error parsing csv row.');
+        return [];
+    }
   }
 
   String _convertTableToCsv(List<Map<dynamic, dynamic>> table) {
@@ -156,7 +177,7 @@ class _TableDisplayPageState extends ConsumerState<TableDisplayPage> {
     }).toList();
   }
 
-  Future<void> _exportToCsv(BuildContext context) async {
+   Future<void> _exportToCsv(BuildContext context) async {
     if (_tableData.isEmpty) {
       _showSnackBar('No table data to export.');
       return;
@@ -179,7 +200,8 @@ class _TableDisplayPageState extends ConsumerState<TableDisplayPage> {
       } else {
         _showSnackBar('Save operation canceled.');
       }
-    } catch (e) {
+    } catch (e, st) {
+      print('Error saving CSV: $e\n$st');
       _showSnackBar('Error saving CSV: $e');
     }
   }
@@ -211,14 +233,14 @@ class _TableDisplayPageState extends ConsumerState<TableDisplayPage> {
       } else {
         _showSnackBar('Save operation canceled.');
       }
-    } catch (e) {
-      _showSnackBar('Error saving file: $e');
+    } catch (e, st) {
+      print('Error saving file: $e\n$st');
+       _showSnackBar('Error saving file: $e');
     }
   }
 
-
   void _showSnackBar(String message) {
-    if (_scaffoldKey.currentContext == null) return;
+    if (!mounted || _scaffoldKey.currentContext == null) return;
     ScaffoldMessenger.of(_scaffoldKey.currentContext!).showSnackBar(
       SnackBar(
           content: Text(message, style: const TextStyle(color: Colors.blue))),

@@ -22,7 +22,6 @@ class _HistoryPageState extends ConsumerState<HistoryPage>
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   late AnimationController _animationController;
 
-
   Future<void> _exportToCsv(BuildContext context, ConversionItem item) async {
     try {
       final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
@@ -41,7 +40,8 @@ class _HistoryPageState extends ConsumerState<HistoryPage>
       } else {
         _showSnackBar('Save operation canceled.');
       }
-    } catch (e) {
+    } catch (e, st) {
+      print('Error saving CSV: $e\n$st');
       _showSnackBar('Error saving CSV: $e');
     }
   }
@@ -73,11 +73,11 @@ class _HistoryPageState extends ConsumerState<HistoryPage>
       } else {
         _showSnackBar('Save operation canceled.');
       }
-    } catch (e) {
+    } catch (e, st) {
+      print('Error saving file: $e\n$st');
       _showSnackBar('Error saving file: $e');
     }
   }
-
 
   @override
   void initState() {
@@ -96,60 +96,67 @@ class _HistoryPageState extends ConsumerState<HistoryPage>
   }
 
   Future<void> _loadHistory() async {
-    final databaseService = ref.read(databaseServiceProvider);
-    _historyItems = databaseService.getConversions();
+     try{
+         final databaseService = ref.read(databaseServiceProvider);
+         _historyItems = databaseService.getConversions();
+     } catch(e, st){
+       print('Error Loading history : $e\n$st');
+       _showSnackBar('Error loading conversion history.');
+     }
   }
 
   void _showImageDialog(String imagePath) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              color: Colors.white,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ClipRRect(
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(16)),
-                  child: Image.file(
-                    File(imagePath),
-                    fit: BoxFit.contain,
+     if(!mounted || _scaffoldKey.currentContext == null) return;
+      showDialog(
+        context: _scaffoldKey.currentContext!,
+        builder: (BuildContext context) {
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                color: Colors.white,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ClipRRect(
+                    borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(16)),
+                    child: Image.file(
+                      File(imagePath),
+                      fit: BoxFit.contain,
+                    ),
                   ),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child:
-                      const Text('Close', style: TextStyle(color: Colors.blue)),
-                ),
-              ],
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child:
+                    const Text('Close', style: TextStyle(color: Colors.blue)),
+                  ),
+                ],
+              ),
             ),
-          ),
-        );
-      },
-    );
+          );
+        },
+      );
   }
 
   Future<void> _deleteConversion(ConversionItem item) async {
     final databaseService = ref.read(databaseServiceProvider);
     try {
       await databaseService.deleteConversion(item.id!);
-      setState(() {
+       setState(() {
         _loadHistory();
       });
-      _showSnackBar('Conversion deleted!');
-    } catch (e) {
+        _showSnackBar('Conversion deleted!');
+    } catch (e, st) {
+      print('Error during conversion deletion : $e\n$st');
       _showSnackBar('Error during deletion: $e');
     }
   }
 
   void _showSnackBar(String message) {
-    if (_scaffoldKey.currentContext == null) return;
+    if (_scaffoldKey.currentContext == null || !mounted) return;
     ScaffoldMessenger.of(_scaffoldKey.currentContext!).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
@@ -246,15 +253,20 @@ class _HistoryPageState extends ConsumerState<HistoryPage>
                               color: Colors.transparent,
                               child: InkWell(
                                 onTap: () async {
-                                  await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => TableDisplayPage(
-                                        parsedData: [item.extractedText],
-                                        images: [XFile(item.imagePath)],
+                                  try {
+                                    await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => TableDisplayPage(
+                                          parsedData: [item.extractedText],
+                                          images: [XFile(item.imagePath)],
+                                        ),
                                       ),
-                                    ),
-                                  );
+                                    );
+                                  } catch (e, st){
+                                      print('Navigation error : $e\n$st');
+                                      _showSnackBar('Error navigating to table please restart and try again.');
+                                   }
                                 },
                                 child: Padding(
                                   padding: const EdgeInsets.all(16),
@@ -347,11 +359,11 @@ class _HistoryPageState extends ConsumerState<HistoryPage>
                                             icon: const Icon(Icons.save_alt),
                                             color: Colors.blue[700],
                                             onPressed: () {
-                                              if(item.type == "md"){
-                                                  _exportToFile(context, item);
-                                              } else {
-                                                _exportToCsv(context, item);
-                                              }
+                                                if(item.type == "md"){
+                                                 _exportToFile(context, item);
+                                                 } else {
+                                                  _exportToCsv(context, item);
+                                               }
                                             }
                                           ),
                                           IconButton(

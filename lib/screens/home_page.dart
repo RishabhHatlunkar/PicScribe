@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:pixelsheet/widgets/api_key_dialog.dart';
 import 'package:pixelsheet/widgets/loading_indicator.dart';
-import 'package:pixelsheet/widgets/custom_app_bar.dart';
 import 'package:pixelsheet/services/csv_service.dart';
 import 'package:pixelsheet/providers/providers.dart';
 import 'package:pixelsheet/models/conversion_item.dart';
@@ -50,27 +49,37 @@ class _HomePageState extends ConsumerState<HomePage> with SingleTickerProviderSt
   }
 
   Future<void> _checkApiKeyAndShowDialog() async {
-    final apiKeyAsync = ref.read(apiKeyProvider);
-    final apiKey = apiKeyAsync.valueOrNull;
-    if (apiKey == null) {
-      _showApiKeyDialog();
+    try {
+      final apiKeyAsync = ref.read(apiKeyProvider);
+      final apiKey = apiKeyAsync.valueOrNull;
+      if (apiKey == null) {
+        _showApiKeyDialog();
+      }
+    } catch (e, st) {
+      print('Error checking API key: $e\n$st');
+       _showSnackBar('An error occurred while checking for the API Key.');
     }
   }
 
+
   Future<void> _pickImage(ImageSource source) async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: source);
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(source: source);
+      if (image != null) {
+        final appDir = await getApplicationDocumentsDirectory();
+        final fileName = basename(image.path);
+        final savedImage = File(join(appDir.path, fileName));
+        await File(image.path).copy(savedImage.path);
 
-    if (image != null) {
-      final appDir = await getApplicationDocumentsDirectory();
-      final fileName = basename(image.path);
-      final savedImage = File(join(appDir.path, fileName));
-
-      await File(image.path).copy(savedImage.path);
-      setState(() {
-        _imageFile = savedImage;
-      });
-      ref.read(imagesProvider.notifier).state = [XFile(savedImage.path)]; // Store the selected image in list
+        setState(() {
+          _imageFile = savedImage;
+        });
+        ref.read(imagesProvider.notifier).state = [XFile(savedImage.path)];
+      }
+    } catch (e, st) {
+        print('Error picking image: $e\n$st');
+       _showSnackBar('Error selecting image. Please try again.');
     }
   }
 
@@ -92,70 +101,76 @@ class _HomePageState extends ConsumerState<HomePage> with SingleTickerProviderSt
       return;
     }
 
-
     if (apiKey == null || apiKey.isEmpty) {
       _showApiKeyDialog();
       return;
     }
-
-    ref.read(extractedTextProvider.notifier).state = [];
-    ref.read(loadingStateProvider.notifier).state = true;
+     ref.read(extractedTextProvider.notifier).state = [];
+     ref.read(loadingStateProvider.notifier).state = true;
 
     try {
       List<dynamic> parsedData = [];
       // since there is one image we get the first one from the list
       var image = images[0];
-      final result =
-      await geminiService.extractTextFromImage(image, instruction);
-
-      if (result[0] == "Error") {
-        throw Exception(result[1]);
-      }
-      parsedData.add(result[1]); // Here I am taking the text directly and sending it
-      final conversionItem = ConversionItem(
-        imagePath: image.path,
-        extractedText: result[1] is String
-            ? result[1]
-            : const ListToCsvConverter().convert(result[1]),
-        timestamp: DateTime.now(),
-        type: getType(result[0]),
-        instruction: instruction,
-      );
+      final result = await geminiService.extractTextFromImage(image, instruction);
+        if (result[0] == "Error") {
+          throw Exception(result[1]);
+        }
+        parsedData.add(result[1]); // Here I am taking the text directly and sending it
+        final conversionItem = ConversionItem(
+          imagePath: image.path,
+          extractedText: result[1] is String
+              ? result[1]
+              : const ListToCsvConverter().convert(result[1]),
+          timestamp: DateTime.now(),
+          type: getType(result[0]),
+          instruction: instruction,
+        );
       await ref.read(saveConversionProvider(conversionItem).future);
       // Update the provider with the parsed data
-      ref.read(parsedDataProvider.notifier).state = parsedData;
-      if (_scaffoldKey.currentContext != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          ref.read(imagesProvider.notifier).state = [];
-          Navigator.push(
-              _scaffoldKey.currentContext!,
-              MaterialPageRoute(
-                builder: (context) => TableDisplayPage(
-                  images: images,
-                  parsedData: parsedData,
-                ),
-              ));
-        });
-      }
-    } catch (e) {
-      print('Error extracting text: $e');
-      _showSnackBar('Error extracting text: $e');
+        ref.read(parsedDataProvider.notifier).state = parsedData;
+
+        if (_scaffoldKey.currentContext != null && mounted) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+            ref.read(imagesProvider.notifier).state = [];
+             Navigator.push(
+                  _scaffoldKey.currentContext!,
+                    MaterialPageRoute(
+                      builder: (context) => TableDisplayPage(
+                       images: images,
+                       parsedData: parsedData,
+                      ),
+                   ));
+            });
+          }
+     }
+    catch (e, st) {
+      print('Error extracting text: $e\n$st');
+        _showSnackBar('Error extracting text: Please try again with another image.');
     } finally {
-      ref.read(loadingStateProvider.notifier).state = false;
+      if (mounted) {
+        ref.read(loadingStateProvider.notifier).state = false;
+      }
     }
-    _imageFile = null;
-    _instructionController.text = "";
+      _imageFile = null;
+      _instructionController.text = "";
   }
 
+
+
   void _showApiKeyDialog() {
-    if (_scaffoldKey.currentContext == null) return;
+    if (!mounted || _scaffoldKey.currentContext == null) return;
     showDialog(
       context: _scaffoldKey.currentContext!,
       builder: (context) {
         return ApiKeyDialog(
           onApiKeySaved: (apiKey) async {
-            await ref.read(apiKeyProvider.notifier).saveApiKey(
-                apiKey);
+            try {
+              await ref.read(apiKeyProvider.notifier).saveApiKey(apiKey);
+            } catch (e, st) {
+              print('Error saving API key: $e\n$st');
+              _showSnackBar('Error saving API key.');
+            }
           },
         );
       },
@@ -166,63 +181,64 @@ class _HomePageState extends ConsumerState<HomePage> with SingleTickerProviderSt
     final extractedText = ref.read(extractedTextProvider);
     final images = ref.read(imagesProvider);
 
-    if (extractedText.isEmpty) {
+     if (extractedText.isEmpty) {
       _showSnackBar('No text extracted to export.');
       return;
     }
-
     List<List<dynamic>> csvData = [
       ['Image', 'Extracted Text']
     ];
 
-    for (int i = 0; i < images.length; i++) {
-      csvData.add([images[i].name, extractedText[i]]);
-    }
+      for (int i = 0; i < images.length; i++) {
+        csvData.add([images[i].name, extractedText[i]]);
+      }
+
 
     try {
       String message = await CsvService.exportToCsv(csvData, 'image_text');
-      _showSnackBar(message);
-    } catch (e) {
+       _showSnackBar(message);
+    } catch (e, st) {
+      print('Error exporting to CSV: $e\n$st');
       _showSnackBar('Error saving CSV: $e');
     }
   }
 
   void _showSnackBar(String message) {
-    if (_scaffoldKey.currentContext == null) return;
-    ScaffoldMessenger.of(_scaffoldKey.currentContext!).showSnackBar(SnackBar(
-        content: Text(message, style: const TextStyle(color: Colors.blue))));
+      if (!mounted || _scaffoldKey.currentContext == null) return;
+      ScaffoldMessenger.of(_scaffoldKey.currentContext!).showSnackBar(SnackBar(
+          content: Text(message, style: const TextStyle(color: Colors.blue))));
   }
 
   void _showImageSourceOptions() {
-    if (_scaffoldKey.currentContext == null) return;
-    showModalBottomSheet(
-      context: _scaffoldKey.currentContext!,
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              ListTile(
-                leading: const Icon(Icons.photo_library),
-                title: const Text('Pick from Gallery'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickImage(ImageSource.gallery);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.camera_alt),
-                title: const Text('Take a Photo'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickImage(ImageSource.camera);
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
+    if (!mounted || _scaffoldKey.currentContext == null) return;
+      showModalBottomSheet(
+        context: _scaffoldKey.currentContext!,
+        builder: (BuildContext context) {
+          return SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                ListTile(
+                  leading: const Icon(Icons.photo_library),
+                  title: const Text('Pick from Gallery'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.gallery);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.camera_alt),
+                  title: const Text('Take a Photo'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+              ],
+            ),
+          );
+        },
+      );
   }
   @override
   Widget build(BuildContext context) {
@@ -234,7 +250,7 @@ class _HomePageState extends ConsumerState<HomePage> with SingleTickerProviderSt
       key: _scaffoldKey,
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: const Color.fromARGB(0, 13, 101, 201),
         elevation: 0,
         title: const Text(
           'PicScribe 📜',
