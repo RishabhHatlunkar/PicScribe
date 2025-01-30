@@ -153,7 +153,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
    print('SettingsPage: build method called.');
     return Scaffold(
       key: _scaffoldKey,
-      appBar: CustomAppBar(
+      appBar: const CustomAppBar(
         title: 'Settings',
       ),
       body: IgnorePointer(
@@ -352,7 +352,7 @@ class _AboutUsPageState extends ConsumerState<AboutUsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: CustomAppBar(
+      appBar: const CustomAppBar(
         title: 'About Picscrabe',
         showBackButton: true,
       ),

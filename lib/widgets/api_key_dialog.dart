@@ -19,7 +19,7 @@ class _ApiKeyDialogState extends ConsumerState<ApiKeyDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('Enter Gemini API Key'),
+      title: const Text('Enter Gemini API Key'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -28,7 +28,7 @@ class _ApiKeyDialogState extends ConsumerState<ApiKeyDialog> {
             obscureText: _obscureText,
             decoration: InputDecoration(
               labelText: 'API Key',
-              border: OutlineInputBorder(),
+              border: const OutlineInputBorder(),
               suffixIcon: IconButton(
                 icon: Icon(
                   _obscureText ? Icons.visibility : Icons.visibility_off,
@@ -49,7 +49,7 @@ class _ApiKeyDialogState extends ConsumerState<ApiKeyDialog> {
           onPressed: () {
             Navigator.pop(context);
           },
-          child: Text('Cancel'),
+          child: const Text('Cancel'),
         ),
         ElevatedButton(
           onPressed: () {
@@ -63,7 +63,7 @@ class _ApiKeyDialogState extends ConsumerState<ApiKeyDialog> {
               });
             }
           },
-          child: Text('Save'),
+          child: const Text('Save'),
         ),
       ],
     );

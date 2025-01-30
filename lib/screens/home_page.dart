@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:pixelsheet/widgets/api_key_dialog.dart';
 import 'package:pixelsheet/widgets/loading_indicator.dart';
-import 'package:pixelsheet/services/csv_service.dart';
+// import 'package:pixelsheet/services/csv_service.dart';
 import 'package:pixelsheet/providers/providers.dart';
 import 'package:pixelsheet/models/conversion_item.dart';
 import 'package:path/path.dart';
@@ -177,31 +177,31 @@ class _HomePageState extends ConsumerState<HomePage> with SingleTickerProviderSt
     );
   }
 
-  Future<void> _exportToCsv() async {
-    final extractedText = ref.read(extractedTextProvider);
-    final images = ref.read(imagesProvider);
+  // Future<void> _exportToCsv() async {
+  //   final extractedText = ref.read(extractedTextProvider);
+  //   final images = ref.read(imagesProvider);
 
-     if (extractedText.isEmpty) {
-      _showSnackBar('No text extracted to export.');
-      return;
-    }
-    List<List<dynamic>> csvData = [
-      ['Image', 'Extracted Text']
-    ];
+  //    if (extractedText.isEmpty) {
+  //     _showSnackBar('No text extracted to export.');
+  //     return;
+  //   }
+  //   List<List<dynamic>> csvData = [
+  //     ['Image', 'Extracted Text']
+  //   ];
 
-      for (int i = 0; i < images.length; i++) {
-        csvData.add([images[i].name, extractedText[i]]);
-      }
+  //     for (int i = 0; i < images.length; i++) {
+  //       csvData.add([images[i].name, extractedText[i]]);
+  //     }
 
 
-    try {
-      String message = await CsvService.exportToCsv(csvData, 'image_text');
-       _showSnackBar(message);
-    } catch (e, st) {
-      print('Error exporting to CSV: $e\n$st');
-      _showSnackBar('Error saving CSV: $e');
-    }
-  }
+  //   try {
+  //     String message = await CsvService.exportToCsv(csvData, 'image_text');
+  //      _showSnackBar(message);
+  //   } catch (e, st) {
+  //     print('Error exporting to CSV: $e\n$st');
+  //     _showSnackBar('Error saving CSV: $e');
+  //   }
+  // }
 
   void _showSnackBar(String message) {
       if (!mounted || _scaffoldKey.currentContext == null) return;
@@ -242,7 +242,7 @@ class _HomePageState extends ConsumerState<HomePage> with SingleTickerProviderSt
   }
   @override
   Widget build(BuildContext context) {
-    final images = ref.watch(imagesProvider);
+    // final images = ref.watch(imagesProvider);
     final isLoading = ref.watch(loadingStateProvider);
     final size = MediaQuery.of(context).size;
 
@@ -458,7 +458,7 @@ class _HomePageState extends ConsumerState<HomePage> with SingleTickerProviderSt
   Widget _buildExtractButton() {
     return Card(
       elevation: 8,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: Colors.white)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: Colors.white)),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
@@ -498,9 +498,9 @@ class _HomePageState extends ConsumerState<HomePage> with SingleTickerProviderSt
 getType(result) {
     final rawString = result as String;
     print(rawString);
-    var _myType = "md";
+    var myType = "md";
     if (rawString.contains('Table')) {
-      _myType = "table"; // CSV has priority in this case
+      myType = "table"; // CSV has priority in this case
     }
-    return _myType;
+    return myType;
 }

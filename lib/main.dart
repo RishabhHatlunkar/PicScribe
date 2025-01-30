@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pixelsheet/screens/home_page.dart';
 import 'package:pixelsheet/screens/settings_page.dart';
-import 'package:pixelsheet/screens/learning_page.dart';
+// import 'package:pixelsheet/screens/learning_page.dart';
 import 'package:animated_notch_bottom_bar/animated_notch_bottom_bar/animated_notch_bottom_bar.dart';
 import 'package:pixelsheet/screens/history_page.dart';
-import 'package:pixelsheet/services/database_service.dart';
+// import 'package:pixelsheet/services/database_service.dart';
 import 'package:pixelsheet/providers/providers.dart';
 import 'package:hive/hive.dart';
 
@@ -20,14 +20,14 @@ void main() async {
 
 
   runApp(
-    ProviderScope(
+    const ProviderScope(
       child:  MyApp(),
     ),
   );
 }
 
 class MyApp extends ConsumerWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return  MaterialApp(
@@ -42,14 +42,13 @@ class MyApp extends ConsumerWidget {
 }
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({Key? key}) : super(key: key);
+  const MainScreen({super.key});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _selectedIndex = 0;
   final _pageController = PageController();
 
   /// Controller to handle PageView and also handles initial page
@@ -97,20 +96,20 @@ class _MainScreenState extends State<MainScreen> {
                     showLabel: false,
                     notchColor: Colors.blue,
                     removeMargins: false,
-                    bottomBarItems: [
+                    bottomBarItems: const [
                       BottomBarItem(
-                        inActiveItem: const Icon(Icons.home_outlined, color: Colors.grey,),
-                        activeItem: const Icon(Icons.home, color: Colors.white,),
+                        inActiveItem: Icon(Icons.home_outlined, color: Colors.grey,),
+                        activeItem: Icon(Icons.home, color: Colors.white,),
                         itemLabel: 'Home',
                       ),
                       BottomBarItem(
-                        inActiveItem: const Icon(Icons.history_outlined, color: Colors.grey),
-                        activeItem: const Icon(Icons.history, color: Colors.white,),
+                        inActiveItem: Icon(Icons.history_outlined, color: Colors.grey),
+                        activeItem: Icon(Icons.history, color: Colors.white,),
                         itemLabel: 'History',
                       ),
                       BottomBarItem(
-                        inActiveItem: const Icon(Icons.settings_outlined, color: Colors.grey),
-                        activeItem: const Icon(Icons.settings, color: Colors.white,),
+                        inActiveItem: Icon(Icons.settings_outlined, color: Colors.grey),
+                        activeItem: Icon(Icons.settings, color: Colors.white,),
                         itemLabel: 'Settings',
                       ),
                     ],

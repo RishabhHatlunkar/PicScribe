@@ -6,13 +6,12 @@ class ConversionTile extends StatelessWidget {
   final ConversionItem item;
   final VoidCallback onExport;
 
-  const ConversionTile({Key? key, required this.item, required this.onExport})
-      : super(key: key);
+  const ConversionTile({super.key, required this.item, required this.onExport});
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: EdgeInsets.all(8.0),
+      margin: const EdgeInsets.all(8.0),
       child: Padding(
         padding: const EdgeInsets.all(8.0),
         child: Column(
@@ -24,7 +23,7 @@ class ConversionTile extends StatelessWidget {
                 'Timestamp: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(item.timestamp)}'),
             ElevatedButton(
               onPressed: onExport,
-              child: Text('Export to CSV'),
+              child: const Text('Export to CSV'),
             ),
           ],
         ),

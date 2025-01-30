@@ -44,7 +44,7 @@ class _LearningPageState extends ConsumerState<LearningPage> {
       if(_scaffoldKey.currentContext != null)
       {
         ScaffoldMessenger.of(_scaffoldKey.currentContext!).showSnackBar(SnackBar(
-            content: Text('Learning Item Deleted!', style: const TextStyle(color: Colors.blue)),
+            content: const Text('Learning Item Deleted!', style: TextStyle(color: Colors.blue)),
             action: SnackBarAction(
               label: 'Undo',
               onPressed: () async {
@@ -81,19 +81,19 @@ class _LearningPageState extends ConsumerState<LearningPage> {
          });
     }
 
-    void _pushLearningDetailPage(LearningItem item) {
-      if(_scaffoldKey.currentContext == null) return;
-        Navigator.push(
-              _scaffoldKey.currentContext!,
-            MaterialPageRoute(builder: (context) => LearningDetailPage(learningItem: item,)),
-           ).then((value) {
-               if (value != null && value == true) {
-                 setState(() {
-                    _loadLearningItems();
-                  });
-                }
-             });
-    }
+    // void _pushLearningDetailPage(LearningItem item) {
+    //   if(_scaffoldKey.currentContext == null) return;
+    //     Navigator.push(
+    //           _scaffoldKey.currentContext!,
+    //         MaterialPageRoute(builder: (context) => LearningDetailPage(learningItem: item,)),
+    //        ).then((value) {
+    //            if (value != null && value == true) {
+    //              setState(() {
+    //                 _loadLearningItems();
+    //               });
+    //             }
+    //          });
+    // }
     void _showSnackBar(String message) {
        if (_scaffoldKey.currentContext == null) return;
        ScaffoldMessenger.of(_scaffoldKey.currentContext!).showSnackBar(SnackBar(
@@ -104,7 +104,7 @@ class _LearningPageState extends ConsumerState<LearningPage> {
   Widget build(BuildContext context) {
     return Scaffold(
        key: _scaffoldKey,
-      appBar: CustomAppBar(title: 'Learning'),
+      appBar: const CustomAppBar(title: 'Learning'),
       body: FutureBuilder<List<LearningItem>>(
           future: _learningItems,
           builder: (context, snapshot) {
@@ -141,7 +141,7 @@ class _LearningPageState extends ConsumerState<LearningPage> {
                     ListView.builder(
                       itemCount: snapshot.data!.length,
                       itemBuilder: (context, index) {
-                      LearningItem item = snapshot.data![index]!;
+                      LearningItem item = snapshot.data![index];
                       return  Card(
                            margin: const EdgeInsets.all(8.0),
                              child: Padding(
@@ -277,7 +277,7 @@ class _LearningAddPageState extends ConsumerState<LearningAddPage> {
     Widget build(BuildContext context) {
       return Scaffold(
          key: _scaffoldKey,
-        appBar: CustomAppBar(title: 'Add Learning Data'),
+        appBar: const CustomAppBar(title: 'Add Learning Data'),
         body: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -355,7 +355,7 @@ class LearningDetailPage extends ConsumerWidget{
   @override
   Widget build(BuildContext context, WidgetRef ref){
     return Scaffold(
-      appBar:  CustomAppBar(title: 'Learning Detail'),
+      appBar:  const CustomAppBar(title: 'Learning Detail'),
        body: Padding(
            padding: const EdgeInsets.all(16.0),
            child: Column(
