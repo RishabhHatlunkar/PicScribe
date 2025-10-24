@@ -32,6 +32,12 @@ flutter pub get
 flutter run
 ```
 
+### For gradle build errors (due to Flutter update)
+```
+(delete android folder) 
+flutter create .
+```
+
 ---
 
 ## 🎯 How It Works
@@ -42,6 +48,17 @@ flutter run
 4️⃣ **Prompt Enhancement** – The app refines the prompt using `prompt.jinja2`.  
 5️⃣ **AI Processing** – The enhanced prompt and image are sent to Gemini AI.  
 6️⃣ **Results** – The output is displayed as structured text or exported as a CSV file.  
+
+---
+
+## How It Looks Like 
+
+<div align='left'>
+  <img src="assets/img1.jpg" alt="Fisrt screen image." height="600"/>
+  <img src="assets/img2.jpg" alt="Second screen image." height="600">
+  <img src="assets/img3.jpg" alt="Third screen image." height="600">
+  <img src="assets/img4.jpg" alt="Forth screen image." height="600">
+</div>
 
 ---
 
@@ -74,6 +91,8 @@ PicScribe/
 - **CSV Processing** – Table generation
 
 ---
+## Release apk 
+
 
 ## 📌 Future Enhancements
 
