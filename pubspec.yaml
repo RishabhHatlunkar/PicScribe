@@ -41,7 +41,7 @@ dependencies:
   path_provider: ^2.1.5
   csv: ^6.0.0
   file_saver: ^0.2.14
-  sqflite: ^2.4.1
+  sqflite: ^2.4.2
   google_generative_ai: ^0.4.6
   animated_notch_bottom_bar: ^1.0.3
   jinja: ^0.6.0
