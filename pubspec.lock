@@ -332,10 +332,10 @@ packages:
     dependency: "direct main"
     description:
       name: jinja
-      sha256: e0e14bb04cde45f944d61140612ee9368cfcd890e3ca65573316b7c6ce51c635
+      sha256: "67485c43c8551688669a81b4e01fe94f6126578ba8c194908d00f254f23f9b8b"
       url: "https://pub.dev"
     source: hosted
-    version: "0.6.2"
+    version: "0.6.5"
   leak_tracker:
     dependency: transitive
     description:
